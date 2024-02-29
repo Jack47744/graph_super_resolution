@@ -26,13 +26,13 @@ def train(model, optimizer, subjects_adj,subjects_labels, args):
           lr = torch.from_numpy(lr).type(torch.FloatTensor)
           hr = torch.from_numpy(hr).type(torch.FloatTensor)
           
-          model_outputs,net_outs,start_gcn_outs,layer_outs = model(lr)
+          model_outputs, net_outs, start_gcn_outs, layer_outs = model(lr)
           model_outputs  = unpad(model_outputs, args.padding)
 
           padded_hr = pad_HR_adj(hr,args.padding)
           eig_val_hr, U_hr = torch.symeig(padded_hr, eigenvectors=True,upper=True)
           
-          loss = args.lmbda * criterion(net_outs, start_gcn_outs) + criterion(model.layer.weights,U_hr) + criterion(model_outputs, hr) 
+          loss = args.lmbda * criterion(net_outs, start_gcn_outs) + criterion(model.layer.weights, U_hr) + criterion(model_outputs, hr) 
           
           error = criterion(model_outputs, hr)
           
@@ -50,13 +50,14 @@ def train(model, optimizer, subjects_adj,subjects_labels, args):
 #   plt.title('GSR-UNet with self reconstruction: Loss')
 #   plt.show(block=False)
     
-def test(model, test_adj, test_labels,args):
+def test(model, test_adj, test_labels, args):
 
   test_error = []
   preds_list=[]
   g_t = []
   
   i=0
+  
   # TESTING
   for lr, hr in zip(test_adj,test_labels):
 
@@ -67,7 +68,7 @@ def test(model, test_adj, test_labels,args):
       lr = torch.from_numpy(lr).type(torch.FloatTensor)
       np.fill_diagonal(hr,1)
       hr = torch.from_numpy(hr).type(torch.FloatTensor)
-      preds,a,b,c = model(lr)
+      preds, a, b, c = model(lr)
       preds = unpad(preds, args.padding)
 
       #plot residuals
