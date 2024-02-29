@@ -5,19 +5,6 @@ from ops import *
 from preprocessing import normalize_adj_torch
 import torch.nn.functional as F
 
-def get_device():
-    # Check for CUDA GPU
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    # Check for Apple MPS (requires PyTorch 1.12 or later)
-    # elif torch.backends.mps.is_available():
-    #     return torch.device("mps")
-    # Fallback to CPU
-    else:
-        return torch.device("cpu")
-
-device = get_device()
-
 class GSRNet(nn.Module):
 
   def __init__(self,ks,args):
@@ -26,15 +13,15 @@ class GSRNet(nn.Module):
     self.lr_dim = args.lr_dim
     self.hr_dim = args.hr_dim
     self.hidden_dim = args.hidden_dim
-    self.layer = GSRLayer(self.lr_dim, self.hr_dim)
+    self.layer = GSRLayer(self.hr_dim, self.lr_dim)
     self.net = GraphUnet(ks, self.lr_dim, self.hr_dim)
     self.gc1 = GraphConvolution(self.hr_dim, self.hidden_dim, 0, act=F.relu)
     self.gc2 = GraphConvolution(self.hidden_dim, self.hr_dim, 0, act=F.relu)
 
   def forward(self,lr):
 
-    I = torch.eye(self.lr_dim).type(torch.FloatTensor).to(device)
-    A = normalize_adj_torch(lr).type(torch.FloatTensor).to(device)
+    I = torch.eye(self.lr_dim).type(torch.FloatTensor)
+    A = normalize_adj_torch(lr).type(torch.FloatTensor)
 
     self.net_outs, self.start_gcn_outs = self.net(A, I)
     
@@ -45,7 +32,7 @@ class GSRNet(nn.Module):
 
     z = self.hidden2
     z = (z + z.t())/2
-    idx = torch.eye(self.hr_dim, dtype=bool).to(device)
+    idx = torch.eye(self.hr_dim, dtype=bool) 
     z[idx]=1
     
     return torch.abs(z), self.net_outs, self.start_gcn_outs, self.outputs
