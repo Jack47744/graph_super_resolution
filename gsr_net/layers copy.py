@@ -10,12 +10,16 @@ from preprocessing import normalize_adj_torch
 
 class GSRLayer(nn.Module):
   
-  def __init__(self,lr_dim,hr_dim):
+  def __init__(self, hr_dim, lr_dim):
     super(GSRLayer, self).__init__()
-    self.lr_dim = lr_dim
     self.hr_dim = hr_dim
-    self.weights = torch.from_numpy(weight_variable_glorot(lr_dim*2)).type(torch.FloatTensor)
-    self.weights = torch.nn.Parameter(data=self.weights, requires_grad = True)
+    self.lr_dim = lr_dim
+    # self.weights = torch.from_numpy(weight_variable_glorot(hr_dim)).type(torch.FloatTensor)
+    # self.weights = torch.nn.Parameter(data=self.weights, requires_grad = True)
+    # self.weights = torch.nn.Parameter(, requires_grad = True)
+    # self.weights = nn.Parameter(data=torch.randn(hr_dim, lr_dim), requires_grad = True)
+    
+    self.weights = torch.nn.init.xavier_uniform_(self.weights)
 
   def forward(self,A,X):
     lr = A
@@ -25,18 +29,20 @@ class GSRLayer(nn.Module):
     # U_lr = torch.abs(U_lr)
     eye_mat = torch.eye(lr_dim).type(torch.FloatTensor)
     s_d = torch.cat((eye_mat,eye_mat),0)
+
+    print(self.weights.shape, s_d.shape)
     
-    a = torch.matmul(self.weights,s_d )
+    a = torch.matmul(self.weights, s_d.T)
+    print(a.shape, torch.t(U_lr).shape)
     b = torch.matmul(a ,torch.t(U_lr))
-    f_d = torch.matmul(b, f)[:self.hr_dim, :] # select top 268 rows (hr_dim)
+    f_d = torch.matmul(b ,f)
     f_d = torch.abs(f_d)
     self.f_d = f_d.fill_diagonal_(1)
     adj = normalize_adj_torch(self.f_d)
     X = torch.mm(adj, adj.t())
     X = (X + X.t())/2
-    idx = torch.eye(self.hr_dim, dtype=bool)    
+    idx = torch.eye(self.hr_dim, dtype=bool)
     X[idx]=1
-    # print(adj.size(), X.size())
     return adj, torch.abs(X)
     
 

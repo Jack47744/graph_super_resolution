@@ -6,12 +6,30 @@ from preprocessing import *
 from model import *
 
 criterion = nn.MSELoss()
+criterion_L1 = nn.L1Loss()
 
-def train(model, optimizer, subjects_adj,subjects_labels, args):
+def get_device():
+    # Check for CUDA GPU
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    # Check for Apple MPS (requires PyTorch 1.12 or later)
+    # elif torch.backends.mps.is_available():
+    #     return torch.device("mps")
+    # Fallback to CPU
+    else:
+        return torch.device("cpu")
+
+device = get_device()
+
+
+def train(model, optimizer, subjects_adj,subjects_labels, args, test_adj, test_ground_truth):
   
   i = 0
   all_epochs_loss = []
   no_epochs = args.epochs
+  best_mae = np.inf
+  early_stop_patient = 3
+  early_stop_count = 0
 
   for epoch in range(no_epochs):
 
@@ -20,21 +38,26 @@ def train(model, optimizer, subjects_adj,subjects_labels, args):
 
       for lr,hr in zip(subjects_adj,subjects_labels):
 
+          model = model.to(device)
           model.train()
           optimizer.zero_grad()
           
-          lr = torch.from_numpy(lr).type(torch.FloatTensor)
-          hr = torch.from_numpy(hr).type(torch.FloatTensor)
+          lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
+          hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
           
           model_outputs,net_outs,start_gcn_outs,layer_outs = model(lr)
-          model_outputs  = unpad(model_outputs, args.padding)
+          # model_outputs  = unpad(model_outputs, args.padding)
 
-          padded_hr = pad_HR_adj(hr,args.padding)
-          eig_val_hr, U_hr = torch.symeig(padded_hr, eigenvectors=True,upper=True)
+          padded_hr = pad_HR_adj(hr,args.padding).to(device)
+          eig_val_hr, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
+          # print(net_outs.size(),start_gcn_outs.size())
+          # print(model.layer.weights.size(), U_hr.size())
+          # print(model_outputs.size(), hr.size())
           
-          loss = args.lmbda * criterion(net_outs, start_gcn_outs) + criterion(model.layer.weights,U_hr) + criterion(model_outputs, hr) 
+          loss = args.lmbda * criterion(net_outs, start_gcn_outs) + criterion(model.layer.weights,U_hr) + criterion(model_outputs, hr).to(device)
           
-          error = criterion(model_outputs, hr)
+          error = criterion_L1(model_outputs, hr)
+          # error_L1 = criterion_L1(model_outputs, hr)
           
           loss.backward()
           optimizer.step()
@@ -43,8 +66,23 @@ def train(model, optimizer, subjects_adj,subjects_labels, args):
           epoch_error.append(error.item())
       
       i+=1
-      print("Epoch: ",i, "Loss: ", np.mean(epoch_loss), "Error: ", np.mean(epoch_error)*100,"%")
+      
       all_epochs_loss.append(np.mean(epoch_loss))
+      test_error = test(model, test_adj, test_ground_truth, args)
+
+
+      if test_error < best_mae:
+        best_mae = test_error
+        early_stop_count = 0
+      elif early_stop_count >= early_stop_patient:
+        return model
+      else: 
+        early_stop_count += 1
+
+      print(f"Epoch: {i}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}")
+      # print("Epoch: ",i, "Train Loss: ", np.mean(epoch_loss), "Train Error: ", np.mean(epoch_error),", Test Error: ", test_error)
+
+  return model
 
 #   plt.plot(all_epochs_loss)
 #   plt.title('GSR-UNet with self reconstruction: Loss')
@@ -52,6 +90,7 @@ def train(model, optimizer, subjects_adj,subjects_labels, args):
     
 def test(model, test_adj, test_labels,args):
 
+  model.eval()
   test_error = []
   preds_list=[]
   g_t = []
@@ -62,35 +101,35 @@ def test(model, test_adj, test_labels,args):
 
     all_zeros_lr = not np.any(lr)
     all_zeros_hr = not np.any(hr)
+    with torch.no_grad():
+      if all_zeros_lr == False and all_zeros_hr==False: #choose representative subject
+        lr = torch.from_numpy(lr).type(torch.FloatTensor)
+        np.fill_diagonal(hr,1)
+        hr = torch.from_numpy(hr).type(torch.FloatTensor)
+        preds,a,b,c = model(lr)
+        # preds = unpad(preds, args.padding)
 
-    if all_zeros_lr == False and all_zeros_hr==False: #choose representative subject
-      lr = torch.from_numpy(lr).type(torch.FloatTensor)
-      np.fill_diagonal(hr,1)
-      hr = torch.from_numpy(hr).type(torch.FloatTensor)
-      preds,a,b,c = model(lr)
-      preds = unpad(preds, args.padding)
-
-      #plot residuals
-    #   if i==0:
-    #     print ("Hr", hr)     
-    #     print("Preds  ", preds)
-    #     plt.imshow(hr, origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-    #     plt.show(block=False)
-    #     plt.imshow(preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-    #     plt.show(block=False)
-    #     plt.imshow(hr - preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-    #     plt.show(block=False)
+        #plot residuals
+      #   if i==0:
+      #     print ("Hr", hr)     
+      #     print("Preds  ", preds)
+      #     plt.imshow(hr, origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
+      #     plt.show(block=False)
+      #     plt.imshow(preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
+      #     plt.show(block=False)
+      #     plt.imshow(hr - preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
+      #     plt.show(block=False)
+        
+        preds_list.append(preds.flatten().detach().numpy())
+        
+        error = criterion_L1(preds, hr)
+        g_t.append(hr.flatten())
+        # print(error.item())
+        test_error.append(error.item())
       
-      preds_list.append(preds.flatten().detach().numpy())
-      
-      error = criterion(preds, hr)
-      g_t.append(hr.flatten())
-      print(error.item())
-      test_error.append(error.item())
-     
-      i+=1
-
-  print ("Test error MSE: ", np.mean(test_error))
+        i+=1
+  # print ("Test error MSE: ", np.mean(test_error))
+  return np.mean(test_error)
   
   #plot histograms
 #   preds_list = [val for sublist in preds_list for val in sublist]

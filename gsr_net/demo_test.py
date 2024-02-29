@@ -89,8 +89,8 @@ if __name__ == "__main__":
 # Y = np.concatenate((subjects_ground_truth, test_ground_truth), axis=0)
 
 # SIMULATING THE DATA: EDIT TO ENTER YOUR OWN DATA
-X = np.random.normal(0, 0.5, (167, 160, 160))
-Y = np.random.normal(0, 0.5, (167, 320, 320))
+X = np.random.normal(0, 0.5, (277, 160, 160))
+Y = np.random.normal(0, 0.5, (277, 320, 320))
 
 cv = KFold(n_splits=args.splits, random_state=42, shuffle=False)
 print("Torch: ")
