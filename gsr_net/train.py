@@ -6,9 +6,7 @@ from preprocessing import *
 from model import *
 import copy
 
-criterion = nn.MSELoss()
-criterion_L1 = nn.L1Loss()
-kl_loss = nn.KLDivLoss()
+
 
 def get_device():
     # Check for CUDA GPU
@@ -20,6 +18,41 @@ def get_device():
     # Fallback to CPU
     else:
         return torch.device("cpu")
+    
+class CosineSimilarityAllLoss(nn.Module):
+    def __init__(self):
+        super(CosineSimilarityAllLoss, self).__init__()
+    
+    def forward(self, output, target):
+        output_flat = output.view(output.size(0), -1)
+        target_flat = target.view(target.size(0), -1)
+        
+        cosine_loss = 1 - torch.mean(torch.cosine_similarity(output_flat, target_flat, dim=1))
+        return cosine_loss
+    
+class ColumnwiseCosineSimilarityLoss(nn.Module):
+    def __init__(self):
+        super(ColumnwiseCosineSimilarityLoss, self).__init__()
+    
+    def forward(self, output, target):
+        # Initialize cosine similarity function
+        cosine_sim = nn.CosineSimilarity(dim=0)
+        
+        # Compute cosine similarity for each column and then take the mean
+        # Assume output and target are square matrices of shape [n_nodes, n_nodes]
+        cosine_sims = torch.tensor([cosine_sim(output[:, i], target[:, i]) for i in range(output.shape[1])])
+        
+        # Since we want to minimize the loss, and higher cosine similarity is better (closer to 1),
+        # we subtract the mean similarity from 1 to represent a loss to minimize.
+        cosine_loss = 1 - torch.mean(cosine_sims)
+        return cosine_loss
+    
+
+criterion = nn.MSELoss()
+criterion_L1 = nn.L1Loss()
+kl_loss = nn.KLDivLoss()
+cosine_sim_all_loss = CosineSimilarityAllLoss()
+cosine_sim_col_loss = ColumnwiseCosineSimilarityLoss()
 
 device = get_device()
 
@@ -33,6 +66,8 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
   early_stop_count = 0
   best_model = None
 
+  model = model.to(device)
+
   for epoch in range(no_epochs):
 
       epoch_loss = []
@@ -40,7 +75,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
 
       for lr,hr in zip(subjects_adj,subjects_labels):
 
-          model = model.to(device)
+          
           model.train()
           optimizer.zero_grad()
           
@@ -60,6 +95,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
              args.lmbda * criterion(net_outs, start_gcn_outs) 
              + criterion(model.layer.weights, U_hr) 
              + criterion(model_outputs, hr)
+             + cosine_sim_col_loss(model_outputs, hr)
           )
           
           error = criterion_L1(model_outputs, hr)

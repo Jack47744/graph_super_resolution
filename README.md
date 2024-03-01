@@ -8,7 +8,7 @@
 
 - A short description of the problem you are solving. Why is the brain graph super-resolution an ineresting problem to solve?
 
-## Name of your model - Methodology
+## Super Idol - Methodology
 
 - Summarize in a few sentences the building blocks of your generative GNN model.
 
