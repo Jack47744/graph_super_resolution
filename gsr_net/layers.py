@@ -28,8 +28,14 @@ class GSRLayer(nn.Module):
     a = torch.matmul(self.weights, s_d)
     b = torch.matmul(a ,torch.t(U_lr))
 
-    f_d = torch.matmul(b, f)[:self.hr_dim, :] # select top 268 rows (hr_dim)
-    # f_d = torch.matmul(b, f)[-self.hr_dim:, :]
+    # f_d = torch.matmul(b, f)
+    # f_d_norm = torch.norm(f_d, dim=1)
+    # _, f_d_idx = torch.topk(f_d_norm, self.hr_dim)
+    # f_d = f_d[f_d_idx, :]
+
+    f_d = torch.matmul(b, f)[:self.hr_dim, :]
+
+
     f_d = torch.abs(f_d)
     self.f_d = f_d.fill_diagonal_(1)
     adj = normalize_adj_torch(self.f_d)

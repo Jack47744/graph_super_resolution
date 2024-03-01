@@ -27,7 +27,7 @@ class CosineSimilarityAllLoss(nn.Module):
         output_flat = output.view(output.size(0), -1)
         target_flat = target.view(target.size(0), -1)
         
-        cosine_loss = 1 - torch.mean(torch.cosine_similarity(output_flat, target_flat, dim=1))
+        cosine_loss = 1 - torch.mean(torch.cosine_similarity(output_flat, target_flat))
         return cosine_loss
     
 class ColumnwiseCosineSimilarityLoss(nn.Module):
@@ -90,12 +90,13 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           # print(net_outs.size(),start_gcn_outs.size())
           # print(model.layer.weights.size(), U_hr.size())
           # print(model_outputs.size(), hr.size())
-          
+        
+
           loss = (
              args.lmbda * criterion(net_outs, start_gcn_outs) 
              + criterion(model.layer.weights, U_hr) 
              + criterion(model_outputs, hr)
-             + cosine_sim_col_loss(model_outputs, hr)
+            #  + cosine_sim_col_loss(model.layer.weights, U_hr) 
           )
           
           error = criterion_L1(model_outputs, hr)
@@ -116,9 +117,12 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
         if test_error < best_mae:
           best_mae = test_error
           early_stop_count = 0
-          best_model = copy.deepcopy(model)
+          best_model = model
         elif early_stop_count >= early_stop_patient:
-          return best_model
+          if test_adj is not None and test_ground_truth is not None:
+            test_error = test(best_model, test_adj, test_ground_truth, args)
+            print(f"Val Error: {test_error:.6f}")
+          return model
         else: 
           early_stop_count += 1
 
@@ -127,8 +131,15 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
       else:
         print(f"Epoch: {epoch}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}")
 
+  if not best_model:
+      best_model = model
+
+  if test_adj is not None and test_ground_truth is not None:
+      test_error = test(model, test_adj, test_ground_truth, args)
+      print(f"Val Error: {test_error:.6f}")
+
   if best_model:
-    return best_model
+      return best_model
   return model
 
 #   plt.plot(all_epochs_loss)
