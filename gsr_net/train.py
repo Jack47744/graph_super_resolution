@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from preprocessing import *
 from model import *
+import copy
 
 criterion = nn.MSELoss()
 criterion_L1 = nn.L1Loss()
@@ -22,14 +23,14 @@ def get_device():
 device = get_device()
 
 
-def train(model, optimizer, subjects_adj,subjects_labels, args, test_adj, test_ground_truth):
+def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, test_ground_truth=None):
   
-  i = 0
   all_epochs_loss = []
   no_epochs = args.epochs
   best_mae = np.inf
   early_stop_patient = 3
   early_stop_count = 0
+  best_model = None
 
   for epoch in range(no_epochs):
 
@@ -65,23 +66,28 @@ def train(model, optimizer, subjects_adj,subjects_labels, args, test_adj, test_g
           epoch_loss.append(loss.item())
           epoch_error.append(error.item())
       
-      i+=1
-      
       all_epochs_loss.append(np.mean(epoch_loss))
-      test_error = test(model, test_adj, test_ground_truth, args)
+
+      if test_adj is not None and test_ground_truth is not None:
+        test_error = test(model, test_adj, test_ground_truth, args)
 
 
-      if test_error < best_mae:
-        best_mae = test_error
-        early_stop_count = 0
-      elif early_stop_count >= early_stop_patient:
-        return model
-      else: 
-        early_stop_count += 1
+        if test_error < best_mae:
+          best_mae = test_error
+          early_stop_count = 0
+          best_model = copy.deepcopy(model)
+        elif early_stop_count >= early_stop_patient:
+          return best_model
+        else: 
+          early_stop_count += 1
 
-      print(f"Epoch: {i}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}")
-      # print("Epoch: ",i, "Train Loss: ", np.mean(epoch_loss), "Train Error: ", np.mean(epoch_error),", Test Error: ", test_error)
+        print(f"Epoch: {epoch}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}")
+        # print("Epoch: ",i, "Train Loss: ", np.mean(epoch_loss), "Train Error: ", np.mean(epoch_error),", Test Error: ", test_error)
+      else:
+        print(f"Epoch: {epoch}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}")
 
+  if best_model:
+    return best_model
   return model
 
 #   plt.plot(all_epochs_loss)

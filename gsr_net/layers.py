@@ -22,13 +22,14 @@ class GSRLayer(nn.Module):
     lr_dim = lr.shape[0]
     f = X
     eig_val_lr, U_lr = torch.linalg.eigh(lr, UPLO='U') 
-    # U_lr = torch.abs(U_lr)
     eye_mat = torch.eye(lr_dim).type(torch.FloatTensor)
-    s_d = torch.cat((eye_mat,eye_mat),0)
+    s_d = torch.cat((eye_mat, eye_mat),0)
     
-    a = torch.matmul(self.weights,s_d )
+    a = torch.matmul(self.weights, s_d)
     b = torch.matmul(a ,torch.t(U_lr))
+
     f_d = torch.matmul(b, f)[:self.hr_dim, :] # select top 268 rows (hr_dim)
+    # f_d = torch.matmul(b, f)[-self.hr_dim:, :]
     f_d = torch.abs(f_d)
     self.f_d = f_d.fill_diagonal_(1)
     adj = normalize_adj_torch(self.f_d)
