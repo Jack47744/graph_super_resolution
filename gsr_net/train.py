@@ -117,7 +117,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
         if test_error < best_mae:
           best_mae = test_error
           early_stop_count = 0
-          best_model = model
+          best_model = copy.deepcopy(model)
         elif early_stop_count >= early_stop_patient:
           if test_adj is not None and test_ground_truth is not None:
             test_error = test(best_model, test_adj, test_ground_truth, args)
@@ -126,10 +126,10 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
         else: 
           early_stop_count += 1
 
-        print(f"Epoch: {epoch}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}")
+        print(f"Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}")
         # print("Epoch: ",i, "Train Loss: ", np.mean(epoch_loss), "Train Error: ", np.mean(epoch_error),", Test Error: ", test_error)
       else:
-        print(f"Epoch: {epoch}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}")
+        print(f"Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}")
 
   if not best_model:
       best_model = model
