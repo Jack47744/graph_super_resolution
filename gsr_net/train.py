@@ -8,6 +8,7 @@ import copy
 
 criterion = nn.MSELoss()
 criterion_L1 = nn.L1Loss()
+kl_loss = nn.KLDivLoss()
 
 def get_device():
     # Check for CUDA GPU
@@ -46,16 +47,20 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
           hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
           
-          model_outputs,net_outs,start_gcn_outs,layer_outs = model(lr)
+          model_outputs, net_outs, start_gcn_outs, layer_outs = model(lr)
           # model_outputs  = unpad(model_outputs, args.padding)
 
-          padded_hr = pad_HR_adj(hr,args.padding).to(device)
+          padded_hr = pad_HR_adj(hr, args.padding).to(device)
           eig_val_hr, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
           # print(net_outs.size(),start_gcn_outs.size())
           # print(model.layer.weights.size(), U_hr.size())
           # print(model_outputs.size(), hr.size())
           
-          loss = args.lmbda * criterion(net_outs, start_gcn_outs) + criterion(model.layer.weights,U_hr) + criterion(model_outputs, hr).to(device)
+          loss = (
+             args.lmbda * criterion(net_outs, start_gcn_outs) 
+             + criterion(model.layer.weights, U_hr) 
+             + criterion(model_outputs, hr)
+          )
           
           error = criterion_L1(model_outputs, hr)
           # error_L1 = criterion_L1(model_outputs, hr)
