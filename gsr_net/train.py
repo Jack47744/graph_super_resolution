@@ -129,7 +129,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           if test_adj is not None and test_ground_truth is not None:
             test_error = test(best_model, test_adj, test_ground_truth, args)
             print(f"Val Error: {test_error:.6f}")
-          return model
+          return best_model
         else: 
           early_stop_count += 1
 
@@ -305,7 +305,7 @@ def test(model, test_adj, test_labels,args):
     with torch.no_grad():
       if all_zeros_lr == False and all_zeros_hr==False: #choose representative subject
         lr = torch.from_numpy(lr).type(torch.FloatTensor)
-        np.fill_diagonal(hr,1)
+        np.fill_diagonal(hr, 1)
         hr = torch.from_numpy(hr).type(torch.FloatTensor)
         preds,a,b,c = model(lr)
         # preds = unpad(preds, args.padding)

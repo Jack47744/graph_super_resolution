@@ -31,6 +31,10 @@ class GSRNet(nn.Module):
     self.gc1 = GraphConvolution(self.hr_dim, self.hidden_dim, 0, act=F.relu)
     self.gc2 = GraphConvolution(self.hidden_dim, self.hr_dim, 0, act=F.relu)
 
+    self.gat1 = GAT(self.hr_dim, self.hidden_dim, F.relu)
+    self.gat2 = GAT(self.hidden_dim, self.hr_dim, F.relu)
+
+
   def forward(self,lr):
 
     I = torch.eye(self.lr_dim).type(torch.FloatTensor).to(device)
@@ -42,6 +46,9 @@ class GSRNet(nn.Module):
     
     self.hidden1 = self.gc1(self.Z, self.outputs)
     self.hidden2 = self.gc2(self.hidden1, self.outputs)
+
+    # self.hidden1 = self.gat1(self.outputs, self.Z)
+    # self.hidden2 = self.gat2(self.outputs, self.hidden1)
 
     z = self.hidden2
     z = (z + z.t())/2
@@ -82,6 +89,6 @@ class Discriminator(nn.Module):
             X = layer(X, A)
 
         output = torch.sigmoid(X.mean(dim=0))
-        
+
         return output
      
