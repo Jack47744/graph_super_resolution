@@ -91,12 +91,18 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           # print(net_outs.size(),start_gcn_outs.size())
           # print(model.layer.weights.size(), U_hr.size())
           # print(model_outputs.size(), hr.size())
+
+          mask = torch.ones_like(model_outputs, dtype=torch.bool)
+          mask.fill_diagonal_(0)
+
+          filtered_matrix1 = torch.masked_select(model_outputs, mask)
+          filtered_matrix2 = torch.masked_select(hr, mask)
         
 
           loss = (
              args.lmbda * criterion(net_outs, start_gcn_outs) 
              + criterion(model.layer.weights, U_hr) 
-             + criterion(model_outputs, hr)
+             + criterion(filtered_matrix1, filtered_matrix2)
             #  + cosine_sim_col_loss(model.layer.weights, U_hr) 
           )
           
