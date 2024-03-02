@@ -123,7 +123,6 @@ class GAT(nn.Module):
         S = (a_input @ self.phi).view(N, N)
         S = F.leaky_relu(S, negative_slope=0.2)
 
-
         mask = (adj + torch.eye(adj.size(0))) > 0
         S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
         attention = F.softmax(S_masked, dim=1)
@@ -155,6 +154,7 @@ class GraphUnet(nn.Module):
         self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
+        self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=1, bias=True) for _ in range(self.l_n)])
 
         # for i in range(self.l_n):
         #     self.down_gcns.append(GCN(dim, dim))
@@ -184,7 +184,12 @@ class GraphUnet(nn.Module):
             A, idx = adj_ms[up_idx], indices_list[up_idx]
             A, X = self.unpools[i](A, X, idx)
             X = self.up_gcns[i](A, X)
-            X = X.add(down_outs[up_idx])
+
+            X = torch.stack([X, down_outs[up_idx]], dim=0).unsqueeze(0)
+            X = self.convs[i](X).squeeze()
+
+
+            # X = X.add(down_outs[up_idx])
         X = torch.cat([X, org_X], 1)
         X = self.end_gcn(A, X)
         

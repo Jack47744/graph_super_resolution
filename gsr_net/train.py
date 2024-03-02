@@ -49,7 +49,8 @@ class ColumnwiseCosineSimilarityLoss(nn.Module):
         return cosine_loss
     
 
-criterion = nn.MSELoss()
+# criterion = nn.MSELoss()
+criterion = nn.SmoothL1Loss(beta=0.01)
 criterion_L1 = nn.L1Loss()
 kl_loss = nn.KLDivLoss()
 cosine_sim_all_loss = CosineSimilarityAllLoss()

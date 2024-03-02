@@ -53,7 +53,7 @@ class GSRNet(nn.Module):
     z = self.hidden2
     z = (z + z.t())/2
     idx = torch.eye(self.hr_dim, dtype=bool).to(device)
-    z[idx]=1
+    z[idx] = 1
     
     return torch.abs(z), self.net_outs, self.start_gcn_outs, self.outputs
   
