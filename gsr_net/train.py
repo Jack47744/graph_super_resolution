@@ -63,7 +63,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
   all_epochs_loss = []
   no_epochs = args.epochs
   best_mae = np.inf
-  early_stop_patient = 3
+  early_stop_patient = args.early_stop_patient
   early_stop_count = 0
   best_model = None
 
