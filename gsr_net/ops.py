@@ -154,7 +154,7 @@ class GraphUnet(nn.Module):
         self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
-        self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=1, bias=True) for _ in range(self.l_n)])
+        self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=3, padding=1, bias=True) for _ in range(self.l_n)])
 
         # for i in range(self.l_n):
         #     self.down_gcns.append(GCN(dim, dim))
@@ -185,9 +185,11 @@ class GraphUnet(nn.Module):
             A, X = self.unpools[i](A, X, idx)
             X = self.up_gcns[i](A, X)
 
-            X = torch.stack([X, down_outs[up_idx]], dim=0).unsqueeze(0)
-            X = self.convs[i](X).squeeze()
-
+            # X = torch.stack([X, down_outs[up_idx]], dim=0).unsqueeze(0)
+            # X = self.convs[i](X).squeeze()
+            X = torch.cat((X.unsqueeze(0), down_outs[up_idx].unsqueeze(0)), dim=0).unsqueeze(0)
+            # print(X.shape)
+            X = self.convs[i](X).squeeze(0).squeeze(0)
 
             # X = X.add(down_outs[up_idx])
         X = torch.cat([X, org_X], 1)
