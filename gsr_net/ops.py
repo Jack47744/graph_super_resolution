@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import torch.nn.functional as F
 
 import os
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
@@ -66,6 +67,72 @@ class GCN(nn.Module):
         X = torch.matmul(A, X)
         X = self.proj(X)
         return X
+    
+class GAT(nn.Module):
+    """
+    A basic implementation of the GAT layer.
+
+    This layer applies an attention mechanism in the graph convolution process,
+    allowing the model to focus on different parts of the neighborhood
+    of each node.
+    """
+    def __init__(self, in_features, out_features, activation = None):
+        super(GAT, self).__init__()
+        # Initialize the weights, bias, and attention parameters as
+        # trainable parameters
+        self.weight = nn.Parameter(torch.FloatTensor(in_features, out_features))
+        self.bias = nn.Parameter(torch.zeros(out_features))
+        self.phi = nn.Parameter(torch.FloatTensor(2 * out_features, 1))
+        self.activation = activation
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        stdv = 1. / np.sqrt(self.weight.size(1))
+        self.weight.data.uniform_(-stdv, stdv)
+
+        stdv = 1. / np.sqrt(self.phi.size(1))
+        self.phi.data.uniform_(-stdv, stdv)
+
+    def forward(self, adj, input):
+        """
+        Forward pass of the GAT layer.
+
+        Parameters:
+        input (Tensor): The input features of the nodes.
+        adj (Tensor): The adjacency matrix of the graph.
+
+        Returns:
+        Tensor: The output features of the nodes after applying the GAT layer.
+        """
+        ############# Your code here ############
+        ## 1. Apply linear transformation and add bias
+        ## 2. Compute the attention scores utilizing the previously
+        ## established mechanism.
+        ## Note: Keep in mind that employing matrix notation can
+        ## optimize this process.
+        ## 3. Compute mask based on adjacency matrix
+        ## 4. Apply mask to the pre-attention matrix
+        ## 5. Compute attention weights using softmax
+        ## 6. Aggregate features based on attention weights
+        ## Note: name the last line as `h`
+        ## (9-10 lines of code)
+        x_prime = input @ self.weight  + self.bias
+
+        N = adj.size(0)
+        a_input = torch.cat([x_prime.repeat(1, N).view(N * N, -1), x_prime.repeat(N, 1)], dim=1)
+        S = (a_input @ self.phi).view(N, N)
+        S = F.leaky_relu(S, negative_slope=0.2)
+
+
+        mask = (adj + torch.eye(adj.size(0))) > 0
+        S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
+        attention = F.softmax(S_masked, dim=1)
+        # print(attention.shape, x_prime.shape)
+        h = attention @ x_prime
+
+        #########################################
+        return self.activation(h) if self.activation else h
+
 
 class GraphUnet(nn.Module):
 
@@ -73,17 +140,19 @@ class GraphUnet(nn.Module):
         super(GraphUnet, self).__init__()
         self.ks = ks
        
-        self.start_gcn = GCN(in_dim, dim)
-        self.bottom_gcn = GCN(dim, dim)
-        self.end_gcn = GCN(2*dim, out_dim)
+        self.start_gcn = GAT(in_dim, dim)
+        self.bottom_gcn = GAT(dim, dim)
+        self.end_gcn = GAT(2*dim, out_dim)
         self.down_gcns = []
         self.up_gcns = []
         self.pools = []
         self.unpools = []
         self.l_n = len(ks)
 
-        self.down_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
-        self.up_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
+        # self.down_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
+        # self.up_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
+        self.down_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
+        self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
 

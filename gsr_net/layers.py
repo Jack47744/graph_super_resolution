@@ -71,3 +71,20 @@ class GraphConvolution(nn.Module):
         output = torch.mm(adj, support)
         # output = self.act(output)
         return output
+    
+
+class GCNLayer(nn.Module):
+    """
+    A single layer of a Graph Convolutional Network (GCN).
+    ...
+    """
+    def __init__(self, input_dim, output_dim, use_nonlinearity=True):
+        super(GCNLayer, self).__init__()
+        self.use_nonlinearity = use_nonlinearity
+        self.Omega = nn.Parameter(torch.randn(input_dim, output_dim) * torch.sqrt(torch.tensor(2.0) / (input_dim + output_dim)))
+        self.beta = nn.Parameter(torch.zeros(output_dim))
+
+    def forward(self, H_k, A_normalized):
+        agg = torch.matmul(A_normalized, H_k)
+        H_k_next = torch.matmul(agg, self.Omega) + self.beta
+        return F.relu(H_k_next) if self.use_nonlinearity else H_k_next

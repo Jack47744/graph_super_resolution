@@ -49,3 +49,39 @@ class GSRNet(nn.Module):
     z[idx]=1
     
     return torch.abs(z), self.net_outs, self.start_gcn_outs, self.outputs
+  
+class Discriminator(nn.Module):
+    """
+    A simple Graph Neural Network model using two layers of Graph Convolutional Network (GCN)
+    for binary classification. The sigmoid activation is applied in the output layer only if
+    use_nonlinearity is set to True.
+    """
+    def __init__(self, input_dim, hidden_sizes=[], use_nonlinearity=True):
+        super(Discriminator, self).__init__()
+        self.use_nonlinearity = use_nonlinearity
+
+        # Define GCN layers
+        # self.gcn1 = GCNLayer(input_dim, hidden_dim_list[0], self.use_nonlinearity)
+        # self.gcn2 = GCNLayer(hidden_dim_list[0], hidden_dim_list[1], self.use_nonlinearity)
+        # self.gcn1 = GCNLayer(hidden_dim_list[1], 1, False)
+
+        self.layers = nn.ModuleList()
+        self.layers.append(GCNLayer(input_dim, hidden_sizes[0], self.use_nonlinearity))
+        for i in range(1, len(hidden_sizes)):
+            self.layers.append(GCNLayer(hidden_sizes[i-1], hidden_sizes[i], self.use_nonlinearity))
+
+        self.layers.append(GCNLayer(hidden_sizes[-1], 1, False))
+
+    def forward(self, A, X):
+
+        # Pass through GCN layers
+        # H1 = self.gcn1(X, A)
+        # H2 = self.gcn2(H1, A)
+
+        for layer in self.layers[:-1]:
+            X = layer(X, A)
+
+        output = torch.sigmoid(X.mean(dim=0))
+        
+        return output
+     
