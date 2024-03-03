@@ -6,6 +6,7 @@ from preprocessing import *
 from model import *
 import copy
 import torch.optim as optim
+from tqdm import tqdm
 
 
 
@@ -70,7 +71,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
 
   model = model.to(device)
 
-  for epoch in range(no_epochs):
+  for epoch in tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch'):
 
       epoch_loss = []
       epoch_error = []
@@ -134,10 +135,11 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
         else: 
           early_stop_count += 1
 
-        print(f"Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}")
-        # print("Epoch: ",i, "Train Loss: ", np.mean(epoch_loss), "Train Error: ", np.mean(epoch_error),", Test Error: ", test_error)
+        tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
+               f'Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}')
       else:
-        print(f"Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}")
+         tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
+               f'Train Error: {np.mean(epoch_error):.6f}')
 
   if not best_model:
       best_model = copy.deepcopy(model)
