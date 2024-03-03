@@ -47,6 +47,24 @@ class ColumnwiseCosineSimilarityLoss(nn.Module):
         # we subtract the mean similarity from 1 to represent a loss to minimize.
         cosine_loss = 1 - torch.mean(cosine_sims)
         return cosine_loss
+
+def drop_nodes(A, p=0.03):
+    '''Randomly drop percent% of nodes (set their rows and columns to zero)'''
+    N = A.shape[0]
+    to_drop = np.random.choice(N, size=int(N * p), replace=False)
+    A[to_drop, :] = 0
+    A[:, to_drop] = 0
+    return A
+    
+def drop_edges(A, p=0.10):
+    '''Randomly drop percent% of edges (set their corresponding entries to zero)'''
+    N = A.shape[1]
+    E = np.sum(A) / 2
+    edges = np.transpose(np.nonzero(np.triu(A)))  # Get the indices of existing edges
+    to_drop = np.random.choice(edges.shape[0], size=int(E * p), replace=False)
+    A[edges[to_drop, 0], edges[to_drop, 1]] = 0
+    A[edges[to_drop, 1], edges[to_drop, 0]] = 0
+    return A
     
 
 # criterion = nn.MSELoss()
@@ -80,6 +98,10 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           
           model.train()
           optimizer.zero_grad()
+
+          if np.random.rand() < 0.40: # prob 0.40 of changing the data
+            lr = drop_nodes(lr.copy(), p = 0.03) # 0.03 prob of dropping nodes (in 0.40)
+            lr = drop_edges(lr, p = 0.10) # 0.10 prob of dropping edges (in 0.40)
           
           lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
           hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
