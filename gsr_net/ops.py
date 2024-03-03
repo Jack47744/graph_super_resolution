@@ -185,13 +185,13 @@ class GraphUnet(nn.Module):
             A, X = self.unpools[i](A, X, idx)
             X = self.up_gcns[i](A, X)
 
-            # X = torch.stack([X, down_outs[up_idx]], dim=0).unsqueeze(0)
-            # X = self.convs[i](X).squeeze()
-            X = torch.cat((X.unsqueeze(0), down_outs[up_idx].unsqueeze(0)), dim=0).unsqueeze(0)
-            # print(X.shape)
-            X = self.convs[i](X).squeeze(0).squeeze(0)
+            # # X = torch.stack([X, down_outs[up_idx]], dim=0).unsqueeze(0)
+            # # X = self.convs[i](X).squeeze()
+            # X = torch.cat((X.unsqueeze(0), down_outs[up_idx].unsqueeze(0)), dim=0).unsqueeze(0)
+            # # print(X.shape)
+            # X = self.convs[i](X).squeeze(0).squeeze(0)
 
-            # X = X.add(down_outs[up_idx])
+            X = X.add(down_outs[up_idx])
         X = torch.cat([X, org_X], 1)
         X = self.end_gcn(A, X)
         

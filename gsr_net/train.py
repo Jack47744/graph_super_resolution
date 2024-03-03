@@ -140,15 +140,13 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
         print(f"Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {np.mean(epoch_error):.6f}")
 
   if not best_model:
-      best_model = model
+      best_model = copy.deepcopy(model)
 
   if test_adj is not None and test_ground_truth is not None:
       test_error = test(model, test_adj, test_ground_truth, args)
       print(f"Val Error: {test_error:.6f}")
 
-  if best_model:
-      return best_model
-  return model
+  return best_model
 
 def cal_laplacian(A):
     D = torch.diag(A.sum(1))
