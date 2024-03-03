@@ -33,7 +33,8 @@ class GSRLayer(nn.Module):
     # _, f_d_idx = torch.topk(f_d_norm, self.hr_dim)
     # f_d = f_d[f_d_idx, :]
 
-    f_d = torch.matmul(b, f)[:self.hr_dim, :]
+    f_d = torch.matmul(b, f)
+    f_d = f_d[:self.hr_dim, :]
 
 
     f_d = torch.abs(f_d)

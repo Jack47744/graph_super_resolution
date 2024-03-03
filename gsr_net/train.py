@@ -54,6 +54,7 @@ class ColumnwiseCosineSimilarityLoss(nn.Module):
 criterion = nn.SmoothL1Loss(beta=0.01)
 criterion_L1 = nn.L1Loss()
 kl_loss = nn.KLDivLoss()
+bce_loss = nn.BCELoss()
 cosine_sim_all_loss = CosineSimilarityAllLoss()
 cosine_sim_col_loss = ColumnwiseCosineSimilarityLoss()
 
@@ -86,13 +87,9 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
           
           model_outputs, net_outs, start_gcn_outs, layer_outs = model(lr)
-          # model_outputs  = unpad(model_outputs, args.padding)
 
           padded_hr = pad_HR_adj(hr, args.padding).to(device)
           eig_val_hr, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
-          # print(net_outs.size(),start_gcn_outs.size())
-          # print(model.layer.weights.size(), U_hr.size())
-          # print(model_outputs.size(), hr.size())
 
           mask = torch.ones_like(model_outputs, dtype=torch.bool)
           mask.fill_diagonal_(0)
@@ -105,11 +102,9 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
              args.lmbda * criterion(net_outs, start_gcn_outs) 
              + criterion(model.layer.weights, U_hr) 
              + criterion(filtered_matrix1, filtered_matrix2)
-            #  + cosine_sim_col_loss(model.layer.weights, U_hr) 
           )
           
           error = criterion_L1(model_outputs, hr)
-          # error_L1 = criterion_L1(model_outputs, hr)
           
           loss.backward()
           optimizer.step()
@@ -162,133 +157,132 @@ def get_node_embedding(A, embedding_size):
     return node_embeddings
 
 def train_gan(
-    netG, 
-    optimizerG, 
-    netD,
-    optimizerD,
-    subjects_adj, 
-    subjects_labels, 
-    args, 
-    test_adj=None, 
-    test_ground_truth=None
+      netG, 
+      optimizerG,
+      netD,
+      optimizerD,
+      subjects_adj, 
+      subjects_labels, 
+      args, 
+      test_adj=None, 
+      test_ground_truth=None
 ):
   
-    all_epochs_loss = []
-    no_epochs = args.epochs
-    best_mae = np.inf
-    early_stop_patient = 3
-    early_stop_count = 0
-    best_model = None
+  all_epochs_loss = []
+  no_epochs = args.epochs
+  best_mae = np.inf
+  early_stop_patient = args.early_stop_patient
+  early_stop_count = 0
+  best_model = None
 
-    
-    # netD = Discriminator(input_dim = 256, hidden_dim_list=[256, 128])
-    # optimizerD = optim.Adam(netD.parameters(), lr=args.lr)
-    bce_loss = nn.BCELoss()
+  netG = netG.to(device)
+  netD = netD.to(device)
 
-    netG = netG.to(device)
-    netD = netD.to(device)
+  for epoch in tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch'):
 
-    for epoch in range(no_epochs):
+      epoch_loss = []
+      epoch_error = []
 
-        epoch_loss = []
-        epoch_error = []
+      for lr,hr in zip(subjects_adj,subjects_labels):
 
-        for lr, hr in zip(subjects_adj, subjects_labels):
-            
-            # Prep Data
-            lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
-            hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
-            padded_hr = pad_HR_adj(hr, args.padding).to(device)
-            _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U')
-            U_hr = U_hr.to(device)
+          
+          netG.train()
+          netD.train()
+          optimizerG.zero_grad()
+          optimizerD.zero_grad()
+          
+          lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
+          hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
+          
+          model_outputs, net_outs, start_gcn_outs, layer_outs = netG(lr)
 
-      
-            hr_node_embeddings = get_node_embedding(hr, args.embedding_size).to(device)
-            
-            ############################
-            # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-            ###########################
-            netD.train()
-            optimizerD.zero_grad()
-            
-            output = netD(hr, hr_node_embeddings).view(-1)
-            errD_real = bce_loss(output, torch.ones_like(output).to(device))
-            errD_real.backward()
+          padded_hr = pad_HR_adj(hr, args.padding).to(device)
+          _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
 
-            fake, net_outs, start_gcn_outs, layer_outs = netG(lr)
-            fake_hr_node_embeddings = get_node_embedding(fake, args.embedding_size).to(device)
+          mask = torch.ones_like(model_outputs, dtype=torch.bool)
+          mask.fill_diagonal_(0)
 
-            output = netD(hr, fake_hr_node_embeddings.detach()).view(-1)
-            errD_fake = bce_loss(output, torch.zeros_like(output).to(device))
-            errD_fake.backward()
-            
-            optimizerD.step()
-
-            ############################
-            # (2) Update G network: maximize log(D(G(z)))
-            ###########################
-            netG.train()
-            optimizerG.zero_grad()
-            output = netD(hr, fake_hr_node_embeddings).view(-1)
-            errG = bce_loss(output, torch.ones_like(output).to(device))
-            
-            loss = (
-              args.lmbda * criterion(net_outs, start_gcn_outs) 
-              + criterion(netG.layer.weights, U_hr) 
-              + criterion(fake, hr)
-              + errG
-            )
-
-            loss.backward()
-            optimizerG.step()
-            
-            error = criterion_L1(fake, hr)
-
-            epoch_loss.append(loss.item())
-            epoch_error.append(error.item())
+          filtered_matrix1 = torch.masked_select(model_outputs, mask)
+          filtered_matrix2 = torch.masked_select(hr, mask)
         
-        all_epochs_loss.append(np.mean(epoch_loss))
 
-        if test_adj is not None and test_ground_truth is not None:
-          test_error = test(netG, test_adj, test_ground_truth, args)
-
-
-          if test_error < best_mae:
-            best_mae = test_error
-            early_stop_count = 0
-            best_model = copy.deepcopy(netG)
-          elif early_stop_count >= early_stop_patient:
-            if test_adj is not None and test_ground_truth is not None:
-              test_error = test(best_model, test_adj, test_ground_truth, args)
-              print(f"Val Error: {test_error:.6f}")
-            return netG
-          else: 
-            early_stop_count += 1
-
-          train_loss = f"{np.mean(epoch_loss):.6f}"
-          train_error = f"{np.mean(epoch_error):.6}"
-          test_error = f"{test_error:.6f}"
-
-          print(
-              f"Epoch: {epoch+1}, Train Loss: {train_loss}, Train Error: {train_error},  Test Error: {test_error}"
+          mse_loss = (
+             args.lmbda * criterion(net_outs, start_gcn_outs) 
+             + criterion(netG.layer.weights, U_hr) 
+             + criterion(filtered_matrix1, filtered_matrix2)
           )
-        else:
-          print(f"Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {train_error}")
+          
+          # Discriminator Update
 
-    if not best_model:
-        best_model = netG
+          error = criterion_L1(model_outputs, hr)
+          real_data = model_outputs.detach()
+          
+          total_length = padded_hr.shape[0]
+          middle_length = args.hr_dim
+          start_index = (total_length - middle_length) // 2
+          end_index = start_index + middle_length
+          padded_hr = padded_hr[start_index:end_index, start_index:end_index]
 
-    if test_adj is not None and test_ground_truth is not None:
+
+          fake_data = gaussian_noise_layer(padded_hr, args)
+          # print(fake_data.shape)
+
+          
+
+          d_real = netD(real_data)
+          d_fake = netD(fake_data)
+
+          dc_loss_real = bce_loss(d_real, torch.ones(args.hr_dim, 1))
+          dc_loss_fake = bce_loss(d_fake, torch.zeros(args.hr_dim, 1))
+          dc_loss = dc_loss_real + dc_loss_fake
+
+          dc_loss.backward()
+          optimizerD.step()
+
+          # Generator Update
+
+          d_fake = netD(gaussian_noise_layer(padded_hr, args))
+
+          gen_loss = bce_loss(d_fake, torch.ones(args.hr_dim, 1))
+          generator_loss = gen_loss + mse_loss
+          generator_loss.backward()
+          optimizerG.step()
+
+          epoch_loss.append(generator_loss.item())
+          epoch_error.append(error.item())
+      
+      all_epochs_loss.append(np.mean(epoch_loss))
+
+      if test_adj is not None and test_ground_truth is not None:
         test_error = test(netG, test_adj, test_ground_truth, args)
-        print(f"Val Error: {test_error:.6f}")
 
-    if best_model:
-        return best_model
-    return netG
 
-#   plt.plot(all_epochs_loss)
-#   plt.title('GSR-UNet with self reconstruction: Loss')
-#   plt.show(block=False)
+        if test_error < best_mae:
+          best_mae = test_error
+          early_stop_count = 0
+          best_model = copy.deepcopy(netG)
+        elif early_stop_count >= early_stop_patient:
+          if test_adj is not None and test_ground_truth is not None:
+            test_error = test(best_model, test_adj, test_ground_truth, args)
+            print(f"Val Error: {test_error:.6f}")
+          return best_model
+        else: 
+          early_stop_count += 1
+
+        tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
+               f'Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}')
+      else:
+         tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
+               f'Train Error: {np.mean(epoch_error):.6f}')
+
+  if not best_model:
+      best_model = copy.deepcopy(netG)
+
+  if test_adj is not None and test_ground_truth is not None:
+      test_error = test(netG, test_adj, test_ground_truth, args)
+      print(f"Val Error: {test_error:.6f}")
+
+  return best_model
     
 def test(model, test_adj, test_labels,args):
 
