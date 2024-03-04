@@ -74,14 +74,48 @@ class Discriminator(nn.Module):
         self.relu_2 = nn.ReLU(inplace=False)
         self.dense_3 = Dense(args.hr_dim, 1, args)
         self.sigmoid = nn.Sigmoid()
+        self.dropout_rate = 0.2
 
-    def forward(self, inputs):
-        np.random.seed(1)
-        torch.manual_seed(1)
-        dc_den1 = self.relu_1(self.dense_1(inputs))
-        dc_den2 = self.relu_2(self.dense_2(dc_den1))
-        output = self.dense_3(dc_den2)
-        return self.sigmoid(output)
+    def forward(self, x):
+        # np.random.seed(1)
+        # torch.manual_seed(1)
+        x = F.dropout(self.relu_1(self.dense_1(x)), self.dropout_rate)
+        x = F.dropout(self.relu_2(self.dense_2(x)), self.dropout_rate)
+        x = self.dense_3(x)
+        return self.sigmoid(x)
+    
+# class Discriminator(nn.Module):
+#     def __init__(self, args):
+#         super(Discriminator, self).__init__()
+
+#         dim = (args.hr_dim**2 - args.hr_dim) // 2
+#         # print(dim, args.hr_dim)
+
+#         self.fc1 = nn.Linear(dim, dim//2)
+#         self.fc2 = nn.Linear(dim//2, dim//4)
+#         self.fc3 = nn.Linear(dim//4, dim//8)
+
+#         # self.relu_1 = nn.ReLU(inplace=False)
+#         # self.dense_2 = Dense(args.hr_dim, args.hr_dim, args)
+#         # self.relu_2 = nn.ReLU(inplace=False)
+#         # self.dense_3 = Dense(args.hr_dim, 1, args)
+#         # self.sigmoid = nn.Sigmoid()
+#         self.dropout_rate = 0.1
+
+#     def forward(self, x):
+#         # np.random.seed(1)
+#         # torch.manual_seed(1)
+#         # x = F.dropout(self.relu_1(self.dense_1(x)), self.dropout_rate)
+#         # x = F.dropout(self.relu_2(self.dense_2(x)), self.dropout_rate)
+#         # x = self.dense_3(x)
+#         # return self.sigmoid(x)
+
+#         # x = F.dropout()
+#         x = F.dropout(F.relu(self.fc1(x)), self.dropout_rate)
+#         x = F.dropout(F.relu(self.fc2(x)), self.dropout_rate)
+#         x = self.fc3(x)
+
+#         return F.sigmoid(x)
 
 
 def gaussian_noise_layer(input_layer, args):

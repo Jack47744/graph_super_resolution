@@ -50,6 +50,11 @@ class ColumnwiseCosineSimilarityLoss(nn.Module):
         return cosine_loss
     
 
+def get_upper_triangle(matrix):
+    n = matrix.shape[0]
+    mask = torch.ones(n, n, dtype=torch.bool).triu().fill_diagonal_(False)
+    return matrix[mask]
+
 # criterion = nn.MSELoss()
 criterion = nn.SmoothL1Loss(beta=0.01)
 criterion_L1 = nn.L1Loss()
@@ -204,7 +209,6 @@ def train_gan(
 
           filtered_matrix1 = torch.masked_select(model_outputs, mask)
           filtered_matrix2 = torch.masked_select(hr, mask)
-        
 
           mse_loss = (
              args.lmbda * criterion(net_outs, start_gcn_outs) 
@@ -225,15 +229,15 @@ def train_gan(
 
 
           fake_data = gaussian_noise_layer(padded_hr, args)
-          # print(fake_data.shape)
 
-          
+          # d_real = netD(get_upper_triangle(real_data))
+          # d_fake = netD(get_upper_triangle(fake_data))
 
           d_real = netD(real_data)
           d_fake = netD(fake_data)
 
-          dc_loss_real = bce_loss(d_real, torch.ones(args.hr_dim, 1))
-          dc_loss_fake = bce_loss(d_fake, torch.zeros(args.hr_dim, 1))
+          dc_loss_real = bce_loss(d_real, torch.ones_like(d_real))
+          dc_loss_fake = bce_loss(d_fake, torch.zeros_like(d_real))
           dc_loss = dc_loss_real + dc_loss_fake
 
           dc_loss.backward()
@@ -241,9 +245,10 @@ def train_gan(
 
           # Generator Update
 
+          # d_fake = netD(get_upper_triangle(gaussian_noise_layer(padded_hr, args)))
           d_fake = netD(gaussian_noise_layer(padded_hr, args))
 
-          gen_loss = bce_loss(d_fake, torch.ones(args.hr_dim, 1))
+          gen_loss = bce_loss(d_fake, torch.ones_like(d_fake))
           generator_loss = gen_loss + mse_loss
           generator_loss.backward()
           optimizerG.step()
