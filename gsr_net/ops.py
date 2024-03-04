@@ -76,7 +76,7 @@ class GAT(nn.Module):
     allowing the model to focus on different parts of the neighborhood
     of each node.
     """
-    def __init__(self, in_features, out_features, activation = None):
+    def __init__(self, in_features, out_features, activation = None, residual = False):
         super(GAT, self).__init__()
         # Initialize the weights, bias, and attention parameters as
         # trainable parameters
@@ -84,6 +84,7 @@ class GAT(nn.Module):
         self.bias = nn.Parameter(torch.zeros(out_features))
         self.phi = nn.Parameter(torch.FloatTensor(2 * out_features, 1))
         self.activation = activation
+        self.residual = residual
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -129,8 +130,14 @@ class GAT(nn.Module):
         # print(attention.shape, x_prime.shape)
         h = attention @ x_prime
 
+        if self.activation:
+            h = self.activation(h)
+
+        if self.residual:
+            h = input + h
+
         #########################################
-        return self.activation(h) if self.activation else h
+        return h
 
 
 class GraphUnet(nn.Module):
@@ -140,7 +147,8 @@ class GraphUnet(nn.Module):
         self.ks = ks
        
         self.start_gcn = GAT(in_dim, dim)
-        self.bottom_gcn = GAT(dim, dim)
+        # self.bottom_gcn = GAT(dim, dim)
+        self.bottom_gcn = GAT(dim, dim, residual=True)
         self.end_gcn = GAT(2*dim, out_dim)
         self.down_gcns = []
         self.up_gcns = []
@@ -148,10 +156,10 @@ class GraphUnet(nn.Module):
         self.unpools = []
         self.l_n = len(ks)
 
-        # self.down_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
-        # self.up_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
-        self.down_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
-        self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
+        # self.down_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
+        # self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
+        self.down_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
+        self.up_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=3, padding=1, bias=True) for _ in range(self.l_n)])
@@ -170,6 +178,9 @@ class GraphUnet(nn.Module):
         X = self.start_gcn(A, X)
         start_gcn_outs = X
         org_X = X
+
+        # residual = X
+        
         for i in range(self.l_n):
             X = self.down_gcns[i](A, X)
             adj_ms.append(A)
@@ -184,13 +195,6 @@ class GraphUnet(nn.Module):
             A, idx = adj_ms[up_idx], indices_list[up_idx]
             A, X = self.unpools[i](A, X, idx)
             X = self.up_gcns[i](A, X)
-
-            # # X = torch.stack([X, down_outs[up_idx]], dim=0).unsqueeze(0)
-            # # X = self.convs[i](X).squeeze()
-            # X = torch.cat((X.unsqueeze(0), down_outs[up_idx].unsqueeze(0)), dim=0).unsqueeze(0)
-            # # print(X.shape)
-            # X = self.convs[i](X).squeeze(0).squeeze(0)
-
             X = X.add(down_outs[up_idx])
         X = torch.cat([X, org_X], 1)
         X = self.end_gcn(A, X)

@@ -7,6 +7,7 @@ from model import *
 import copy
 import torch.optim as optim
 from tqdm import tqdm
+from centrality import *
 
 
 
@@ -20,6 +21,12 @@ def get_device():
     # Fallback to CPU
     else:
         return torch.device("cpu")
+    
+def pearson_coor(input, target):
+    vx = input - torch.mean(input)
+    vy = target - torch.mean(target)
+    cost = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)))
+    return cost
     
 class CosineSimilarityAllLoss(nn.Module):
     def __init__(self):
@@ -60,6 +67,7 @@ def get_upper_triangle(matrix):
 
 # criterion = nn.MSELoss()
 criterion = nn.SmoothL1Loss(beta=0.01)
+# criterion = nn.L1Loss()
 criterion_L1 = nn.L1Loss()
 kl_loss = nn.KLDivLoss()
 bce_loss = nn.BCELoss()
@@ -115,6 +123,24 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
              + criterion(model.layer.weights, U_hr) 
              + criterion(filtered_matrix1, filtered_matrix2)
           )
+
+          # target_n = hr.detach().cpu().clone().numpy()
+          # predicted_n = model_outputs.detach().cpu().clone().numpy()
+          # torch.cuda.empty_cache()
+
+          # target_t = eigen_centrality(target_n)
+          # real_topology = torch.tensor(target_t)
+          # predicted_t = eigen_centrality(predicted_n)
+          # fake_topology = torch.tensor(predicted_t)
+          # topo_loss = criterion_L1(fake_topology, real_topology)
+
+          # torch.cuda.empty_cache()
+
+          # loss = (
+          #    cal_error(model_outputs, hr, mask)
+          #    + (1 - pearson_coor(model_outputs, hr))
+          #    + topo_loss
+          # )
           
           # error = criterion_L1(model_outputs, hr)
           error = cal_error(model_outputs, hr, mask)
