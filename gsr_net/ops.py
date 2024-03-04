@@ -76,7 +76,7 @@ class GAT(nn.Module):
     allowing the model to focus on different parts of the neighborhood
     of each node.
     """
-    def __init__(self, in_features, out_features, activation = None, residual = False):
+    def __init__(self, in_features, out_features, activation = None, residual=False, layer_norm=True):
         super(GAT, self).__init__()
         # Initialize the weights, bias, and attention parameters as
         # trainable parameters
@@ -85,7 +85,13 @@ class GAT(nn.Module):
         self.phi = nn.Parameter(torch.FloatTensor(2 * out_features, 1))
         self.activation = activation
         self.residual = residual
+        self.layer_norm = layer_norm
         self.reset_parameters()
+        # self.norm = nn.LayerNorm(embed_size)
+        # if self.layer_norm:
+        #     self.ln = nn.LayerNorm(out_features)
+
+        
 
     def reset_parameters(self):
         stdv = 1. / np.sqrt(self.weight.size(1))
@@ -95,28 +101,6 @@ class GAT(nn.Module):
         self.phi.data.uniform_(-stdv, stdv)
 
     def forward(self, adj, input):
-        """
-        Forward pass of the GAT layer.
-
-        Parameters:
-        input (Tensor): The input features of the nodes.
-        adj (Tensor): The adjacency matrix of the graph.
-
-        Returns:
-        Tensor: The output features of the nodes after applying the GAT layer.
-        """
-        ############# Your code here ############
-        ## 1. Apply linear transformation and add bias
-        ## 2. Compute the attention scores utilizing the previously
-        ## established mechanism.
-        ## Note: Keep in mind that employing matrix notation can
-        ## optimize this process.
-        ## 3. Compute mask based on adjacency matrix
-        ## 4. Apply mask to the pre-attention matrix
-        ## 5. Compute attention weights using softmax
-        ## 6. Aggregate features based on attention weights
-        ## Note: name the last line as `h`
-        ## (9-10 lines of code)
         x_prime = input @ self.weight  + self.bias
 
         N = adj.size(0)
@@ -127,16 +111,16 @@ class GAT(nn.Module):
         mask = (adj + torch.eye(adj.size(0))) > 0
         S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
         attention = F.softmax(S_masked, dim=1)
-        # print(attention.shape, x_prime.shape)
         h = attention @ x_prime
-
-        if self.activation:
-            h = self.activation(h)
 
         if self.residual:
             h = input + h
 
-        #########################################
+        # if self.layer_norm:
+        #     h = self.ln(h)
+
+        if self.activation:
+            h = self.activation(h)
         return h
 
 
@@ -178,8 +162,6 @@ class GraphUnet(nn.Module):
         X = self.start_gcn(A, X)
         start_gcn_outs = X
         org_X = X
-
-        # residual = X
         
         for i in range(self.l_n):
             X = self.down_gcns[i](A, X)
@@ -187,7 +169,6 @@ class GraphUnet(nn.Module):
             down_outs.append(X)
             A, X, idx = self.pools[i](A, X)
             indices_list.append(idx)
-            # print('Down_gcns, i = ', i)
         
         X = self.bottom_gcn(A, X)
         for i in range(self.l_n):

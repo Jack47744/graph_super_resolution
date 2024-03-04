@@ -79,8 +79,8 @@ class Discriminator(nn.Module):
     def forward(self, x):
         # np.random.seed(1)
         # torch.manual_seed(1)
-        x = F.dropout(self.relu_1(self.dense_1(x)), self.dropout_rate)
-        x = F.dropout(self.relu_2(self.dense_2(x)), self.dropout_rate)
+        x = F.dropout(self.relu_1(self.dense_1(x)), self.dropout_rate) + x
+        x = F.dropout(self.relu_2(self.dense_2(x)), self.dropout_rate) + x
         x = self.dense_3(x)
         return self.sigmoid(x)
     
