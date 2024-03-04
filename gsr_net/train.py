@@ -55,6 +55,9 @@ def get_upper_triangle(matrix):
     mask = torch.ones(n, n, dtype=torch.bool).triu().fill_diagonal_(False)
     return matrix[mask]
 
+
+   
+
 # criterion = nn.MSELoss()
 criterion = nn.SmoothL1Loss(beta=0.01)
 criterion_L1 = nn.L1Loss()
@@ -65,6 +68,8 @@ cosine_sim_col_loss = ColumnwiseCosineSimilarityLoss()
 
 device = get_device()
 
+def cal_error(model_outputs, hr, mask):
+   return criterion_L1(model_outputs[mask], hr[mask])
 
 def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, test_ground_truth=None):
   
@@ -76,6 +81,8 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
   best_model = None
 
   model = model.to(device)
+
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
 
   for epoch in tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch'):
 
@@ -109,7 +116,8 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
              + criterion(filtered_matrix1, filtered_matrix2)
           )
           
-          error = criterion_L1(model_outputs, hr)
+          # error = criterion_L1(model_outputs, hr)
+          error = cal_error(model_outputs, hr, mask)
           
           loss.backward()
           optimizer.step()
@@ -183,18 +191,26 @@ def train_gan(
   netG = netG.to(device)
   netD = netD.to(device)
 
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
+
   for epoch in tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch'):
 
       epoch_loss = []
       epoch_error = []
 
-      for lr,hr in zip(subjects_adj,subjects_labels):
+      # lossD = 0
+      # lossG = 0
+      # i = 0
 
+      netG.train()
+      netD.train()
+
+      for lr,hr in zip(subjects_adj,subjects_labels):
           
-          netG.train()
-          netD.train()
+          # if i % 10 == 0:
           optimizerG.zero_grad()
           optimizerD.zero_grad()
+
           
           lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
           hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
@@ -218,7 +234,8 @@ def train_gan(
           
           # Discriminator Update
 
-          error = criterion_L1(model_outputs, hr)
+          # error = criterion_L1(model_outputs, hr)
+          error = cal_error(model_outputs, hr, mask)
           real_data = model_outputs.detach()
           
           total_length = padded_hr.shape[0]
@@ -289,12 +306,14 @@ def train_gan(
 
   return best_model
     
-def test(model, test_adj, test_labels,args):
+def test(model, test_adj, test_labels, args):
 
   model.eval()
   test_error = []
   preds_list=[]
   g_t = []
+
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
   
   i=0
   # TESTING
@@ -307,7 +326,7 @@ def test(model, test_adj, test_labels,args):
         lr = torch.from_numpy(lr).type(torch.FloatTensor)
         np.fill_diagonal(hr, 1)
         hr = torch.from_numpy(hr).type(torch.FloatTensor)
-        preds,a,b,c = model(lr)
+        preds, _, _, _ = model(lr)
         # preds = unpad(preds, args.padding)
 
         #plot residuals
@@ -323,7 +342,8 @@ def test(model, test_adj, test_labels,args):
         
         preds_list.append(preds.flatten().detach().numpy())
         
-        error = criterion_L1(preds, hr)
+        # error = criterion_L1(preds, hr)
+        error = cal_error(preds, hr, mask)
         g_t.append(hr.flatten())
         # print(error.item())
         test_error.append(error.item())
