@@ -109,8 +109,8 @@ class MultiHeadGAT(nn.Module):
 
             a_input = torch.cat([x_prime.repeat(1, N).view(N * N, -1), x_prime.repeat(N, 1)], dim=1)
             S = torch.matmul(a_input, self.phis[i]).view(N, N)
-            # S = F.leaky_relu(S, negative_slope=0.2)
-            S = F.gelu(S)
+            S = F.leaky_relu(S, negative_slope=0.2)
+            # S = F.gelu(S)
 
             mask = (adj + torch.eye(N, device=adj.device)) > 0
             S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
