@@ -21,6 +21,8 @@ def get_device():
     # Fallback to CPU
     else:
         return torch.device("cpu")
+
+device = get_device()
     
 def pearson_coor(input, target):
     vx = input - torch.mean(input)
@@ -77,6 +79,9 @@ cosine_sim_col_loss = ColumnwiseCosineSimilarityLoss()
 device = get_device()
 
 def cal_error(model_outputs, hr, mask):
+   
+   hr = hr.to(device)
+   mask = mask.to(device)
    return criterion_L1(model_outputs[mask], hr[mask])
 
 def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, test_ground_truth=None):
@@ -243,9 +248,16 @@ def train_gan(
           hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
           
           model_outputs, net_outs, start_gcn_outs, layer_outs = netG(lr)
+          model_outputs = model_outputs.to(device)
+          start_gcn_outs = start_gcn_outs.to(device)
+          hr = hr.to(device)
+          net_outs = net_outs.to(device)
 
-          padded_hr = pad_HR_adj(hr, args.padding).to(device)
+          padded_hr = pad_HR_adj(hr, args.padding)
+          padded_hr = padded_hr.to(device)
           _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
+          U_hr = U_hr.to(device)
+
 
           mask = torch.ones_like(model_outputs, dtype=torch.bool)
           mask.fill_diagonal_(0)
@@ -355,6 +367,7 @@ def test(model, test_adj, test_labels, args):
         np.fill_diagonal(hr, 1)
         hr = torch.from_numpy(hr).type(torch.FloatTensor)
         preds, _, _, _ = model(lr)
+        preds = preds.to(device)
         # preds = unpad(preds, args.padding)
 
         #plot residuals
@@ -368,7 +381,7 @@ def test(model, test_adj, test_labels, args):
       #     plt.imshow(hr - preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
       #     plt.show(block=False)
         
-        preds_list.append(preds.flatten().detach().numpy())
+        preds_list.append(preds.flatten().cpu().detach().numpy())
         
         # error = criterion_L1(preds, hr)
         error = cal_error(preds, hr, mask)

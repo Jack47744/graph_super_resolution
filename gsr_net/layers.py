@@ -1,3 +1,4 @@
+from pandas import period_range
 import torch
 import torch.nn as nn
 import numpy as np
@@ -6,7 +7,17 @@ import matplotlib.pyplot as plt
 from initializations import *
 from preprocessing import normalize_adj_torch
 
-
+def get_device():
+    # Check for CUDA GPU
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    # Check for Apple MPS (requires PyTorch 1.12 or later)
+    # elif torch.backends.mps.is_available():
+    #     return torch.device("mps")
+    # Fallback to CPU
+    else:
+        return torch.device("cpu")
+device = get_device()
 
 class GSRLayer(nn.Module):
   
@@ -23,8 +34,8 @@ class GSRLayer(nn.Module):
     f = X
     eig_val_lr, U_lr = torch.linalg.eigh(lr, UPLO='U') 
     eye_mat = torch.eye(lr_dim).type(torch.FloatTensor)
-    s_d = torch.cat((eye_mat, eye_mat),0)
-    
+    s_d = torch.cat((eye_mat, eye_mat),0).to(device)
+
     a = torch.matmul(self.weights, s_d)
     b = torch.matmul(a ,torch.t(U_lr))
 
