@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
+from layers import GCNLayer
 
 import os
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
@@ -68,6 +69,71 @@ class GCN(nn.Module):
         X = self.proj(X)
         return X
     
+
+class MultiHeadGAT(nn.Module):
+    def __init__(self, in_features, out_features, heads=4, activation=None, residual=False, layer_norm=False):
+        super(MultiHeadGAT, self).__init__()
+        self.in_features = in_features
+
+        # print(f"Multihead: {heads}")
+
+        self.out_features = out_features // heads  # Adjust the size per head
+        assert out_features % heads == 0
+        self.heads = heads
+        self.activation = activation
+        self.residual = residual
+        self.layer_norm = layer_norm
+
+        # Initialize parameters for each head
+        self.weights = nn.Parameter(torch.FloatTensor(heads, in_features, self.out_features))
+        self.biases = nn.Parameter(torch.FloatTensor(heads, self.out_features))
+        self.phis = nn.Parameter(torch.FloatTensor(heads, 2 * self.out_features, 1))
+
+        if self.layer_norm:
+            self.norm = nn.LayerNorm(out_features)
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for i in range(self.heads):
+            nn.init.xavier_uniform_(self.weights[i])
+            nn.init.zeros_(self.biases[i])
+            nn.init.xavier_uniform_(self.phis[i])
+
+    def forward(self, adj, input):
+        head_outputs = []
+        N = adj.size(0)
+
+        for i in range(self.heads):
+            x_prime = torch.matmul(input, self.weights[i]) + self.biases[i]
+
+            a_input = torch.cat([x_prime.repeat(1, N).view(N * N, -1), x_prime.repeat(N, 1)], dim=1)
+            S = torch.matmul(a_input, self.phis[i]).view(N, N)
+            # S = F.leaky_relu(S, negative_slope=0.2)
+            S = F.gelu(S)
+
+            mask = (adj + torch.eye(N, device=adj.device)) > 0
+            S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
+            attention = F.softmax(S_masked, dim=1)
+            h = torch.matmul(attention, x_prime)
+
+            head_outputs.append(h)
+
+            # print(h.shape)
+        h_concat = torch.cat(head_outputs, dim=-1)
+        # print(h_concat.shape)
+
+        if self.residual:
+            h_concat += input
+
+        if self.activation:
+            h_concat = self.activation(h_concat)
+
+        if self.layer_norm:
+            h_concat = self.norm(h_concat)
+
+        return h_concat
+    
 class GAT(nn.Module):
     """
     A basic implementation of the GAT layer.
@@ -87,18 +153,15 @@ class GAT(nn.Module):
         self.residual = residual
         self.layer_norm = layer_norm
         self.reset_parameters()
-        # self.norm = nn.LayerNorm(embed_size)
-        # if self.layer_norm:
-        #     self.ln = nn.LayerNorm(out_features)
-
-        
 
     def reset_parameters(self):
-        stdv = 1. / np.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
+        # stdv = 1. / np.sqrt(self.weight.size(1))
+        # self.weight.data.uniform_(-stdv, stdv)
 
-        stdv = 1. / np.sqrt(self.phi.size(1))
-        self.phi.data.uniform_(-stdv, stdv)
+        # stdv = 1. / np.sqrt(self.phi.size(1))
+        # self.phi.data.uniform_(-stdv, stdv)
+        nn.init.xavier_uniform_(self.weight)
+        nn.init.xavier_uniform_(self.phi)
 
     def forward(self, adj, input):
         x_prime = input @ self.weight  + self.bias
@@ -116,9 +179,6 @@ class GAT(nn.Module):
         if self.residual:
             h = input + h
 
-        # if self.layer_norm:
-        #     h = self.ln(h)
-
         if self.activation:
             h = self.activation(h)
         return h
@@ -130,10 +190,10 @@ class GraphUnet(nn.Module):
         super(GraphUnet, self).__init__()
         self.ks = ks
        
-        self.start_gcn = GAT(in_dim, dim)
+        self.start_gcn = MultiHeadGAT(in_dim, dim)
         # self.bottom_gcn = GAT(dim, dim)
-        self.bottom_gcn = GAT(dim, dim, residual=True)
-        self.end_gcn = GAT(2*dim, out_dim)
+        self.bottom_gcn = MultiHeadGAT(dim, dim, residual=True)
+        self.end_gcn = MultiHeadGAT(2*dim, out_dim)
         self.down_gcns = []
         self.up_gcns = []
         self.pools = []
@@ -142,8 +202,8 @@ class GraphUnet(nn.Module):
 
         # self.down_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
         # self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
-        self.down_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
-        self.up_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
+        self.down_gcns = nn.ModuleList([MultiHeadGAT(dim, dim, residual=True) for i in range(self.l_n)])
+        self.up_gcns = nn.ModuleList([MultiHeadGAT(dim, dim, residual=True) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=3, padding=1, bias=True) for _ in range(self.l_n)])

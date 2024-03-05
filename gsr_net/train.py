@@ -122,6 +122,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
              args.lmbda * criterion(net_outs, start_gcn_outs) 
              + criterion(model.layer.weights, U_hr) 
              + criterion(filtered_matrix1, filtered_matrix2)
+            #  + (1 - pearson_coor(filtered_matrix1, filtered_matrix2))
           )
 
           # target_n = hr.detach().cpu().clone().numpy()
@@ -256,6 +257,7 @@ def train_gan(
              args.lmbda * criterion(net_outs, start_gcn_outs) 
              + criterion(netG.layer.weights, U_hr) 
              + criterion(filtered_matrix1, filtered_matrix2)
+            #  + (1 - pearson_coor(filtered_matrix1, filtered_matrix2))
           )
           
           # Discriminator Update
