@@ -223,6 +223,7 @@ def train_gan(
   early_stop_patient = args.early_stop_patient
   early_stop_count = 0
   best_model = None
+  batch_size = args.batch_size
 
   netG = netG.to(device)
   netD = netD.to(device)
@@ -236,22 +237,21 @@ def train_gan(
       epoch_loss = []
       epoch_error = []
 
-      # lossD = 0
-      # lossG = 0
-      # i = 0
-
       netG.train()
       netD.train()
 
-      for lr,hr in zip(subjects_adj,subjects_labels):
+      dataset = torch.utils.data.TensorDataset(torch.from_numpy(subjects_adj), torch.from_numpy(subjects_labels))
+      dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+      for lr,hr in dataloader:
           
+        
           # if i % 10 == 0:
           optimizerG.zero_grad()
           optimizerD.zero_grad()
 
-          
-          lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
-          hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
+          lr = lr.type(torch.FloatTensor).to(device)
+          hr = hr.type(torch.FloatTensor).to(device)
           
           model_outputs, net_outs, start_gcn_outs, layer_outs = netG(lr)
           model_outputs = model_outputs.to(device)

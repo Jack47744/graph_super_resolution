@@ -40,14 +40,34 @@ def pad_HR_adj(label, split):
   return label_padded.type(torch.FloatTensor)
 
 def normalize_adj_torch(mx):
-    # mx = mx.to_dense()
-    rowsum = mx.sum(1)
-    r_inv_sqrt = torch.pow(rowsum, -0.5).flatten()
-    r_inv_sqrt[torch.isinf(r_inv_sqrt)] = 0.
-    r_mat_inv_sqrt = torch.diag(r_inv_sqrt)
-    mx = torch.matmul(mx, r_mat_inv_sqrt)
-    mx = torch.transpose(mx, 0, 1)
-    mx = torch.matmul(mx, r_mat_inv_sqrt)
+    # # mx = mx.to_dense()
+    # rowsum = mx.sum(1)
+    # r_inv_sqrt = torch.pow(rowsum, -0.5).flatten()
+    # r_inv_sqrt[torch.isinf(r_inv_sqrt)] = 0.
+    # r_mat_inv_sqrt = torch.diag(r_inv_sqrt)
+    # mx = torch.matmul(mx, r_mat_inv_sqrt)
+    # mx = torch.transpose(mx, 0, 1)
+    # mx = torch.matmul(mx, r_mat_inv_sqrt)
+    # return mx
+
+    """Normalize adjacency matrices in a batch."""
+
+    # Assumes mx is a batch of adjacency matrices (e.g., shape [batch_size, N, N])
+    batch_size, N, _ = mx.shape 
+
+    # Calculate degree matrix for each matrix in the batch
+    rowsum = mx.sum(2)  # Sum across the last dimension (axis=2)
+
+    # Avoid division by zero
+    rowsum[rowsum == 0] = 1  
+
+    # Calculate inverse square root of degree matrix (avoiding additional diagonal creation)
+    r_inv_sqrt = torch.pow(rowsum, -0.5)
+
+    # Normalize each matrix in the batch: D^(-1/2) * A * D^(-1/2)
+    for i in range(batch_size):
+        mx[i] = torch.matmul(torch.matmul(mx[i], torch.diag(r_inv_sqrt[i])), torch.diag(r_inv_sqrt[i]))
+
     return mx
 
 def unpad(data, split):

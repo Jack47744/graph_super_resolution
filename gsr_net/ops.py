@@ -103,7 +103,7 @@ class MultiHeadGAT(nn.Module):
     def forward(self, adj, input):
         head_outputs = []
         N = adj.size(0)
-
+        print(f"N = {N}")
         for i in range(self.heads):
             x_prime = torch.matmul(input, self.weights[i]) + self.biases[i]
 

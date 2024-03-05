@@ -33,7 +33,9 @@ class GSRNet(nn.Module):
 
   def forward(self,lr):
 
+    print(lr.size())
     I = torch.eye(self.lr_dim).type(torch.FloatTensor).to(device)
+    I = I.unsqueeze(0).repeat(lr.size(0), 1, 1)
     A = normalize_adj_torch(lr).type(torch.FloatTensor).to(device)
 
     self.net_outs, self.start_gcn_outs = self.net(A, I)
