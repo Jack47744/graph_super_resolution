@@ -26,8 +26,13 @@ class GraphUnpool(nn.Module):
         super(GraphUnpool, self).__init__()
 
     def forward(self, A, X, idx):
-        new_X = torch.zeros([A.shape[0], X.shape[1]]).to(device)
-        new_X[idx] = X
+        print(f"GraphUnpool X: {X.shape}")
+        print(f"GraphUnpool A: {A.shape}")
+        print(f"GraphUnpool idx: {idx.shape}")
+        new_X = torch.zeros([A.shape[0], A.shape[1], X.shape[2]]).to(device)
+        new_X = new_X.scatter_(1, idx.unsqueeze(2).expand(-1, -1, X.shape[2]), X)
+        # new_X[idx] = X
+        print(f"GraphUnpool new_X: {new_X.shape}")
         return A, new_X
 
     
@@ -44,13 +49,14 @@ class GraphPool(nn.Module):
         # scores = torch.abs(scores)
         scores = torch.squeeze(scores)
         scores = self.sigmoid(scores/100)
-        num_nodes = A.shape[0]
+        num_nodes = A.shape[1]
         values, idx = torch.topk(scores, int(self.k*num_nodes))
-        new_X = X[idx, :]
+        batch_indices = np.arange(X.shape[0])[:, None]
+        new_X = X[batch_indices, idx, :]
         values = torch.unsqueeze(values, -1)
         new_X = torch.mul(new_X, values)
-        A = A[idx, :]
-        A = A[:, idx]
+        A = A[batch_indices, idx, :]
+        A = A[batch_indices, :, idx]
         return A, new_X, idx
 
 
@@ -101,14 +107,20 @@ class MultiHeadGAT(nn.Module):
             nn.init.xavier_uniform_(self.phis[i])
 
     def forward(self, adj, input):
-        head_outputs = []
-        N = adj.size(0)
-        print(f"N = {N}")
+        head_outputs = [] 
+
+        batch_size, N, _ = adj.size()
+
         for i in range(self.heads):
+            print(f"MultiHeadGAT input: {input.shape}")
+            print(f"MultiHeadGAT weights: {self.weights[i].shape}")
+            print(f"MultiHeadGAT biases: {self.biases[i].shape}")
             x_prime = torch.matmul(input, self.weights[i]) + self.biases[i]
 
-            a_input = torch.cat([x_prime.repeat(1, N).view(N * N, -1), x_prime.repeat(N, 1)], dim=1)
-            S = torch.matmul(a_input, self.phis[i]).view(N, N)
+            print(f"MultiHeadGAT x_prime: {x_prime.shape}")
+            a_input = torch.cat([x_prime.repeat(1, 1, N).view(batch_size, N * N, -1), x_prime.repeat(1, N, 1)], dim=2)
+            print(f"phi: {self.phis[i].shape}")
+            S = torch.matmul(a_input, self.phis[i]).view(batch_size, N, N)
             S = F.leaky_relu(S, negative_slope=0.2)
             # S = F.gelu(S)
 
@@ -133,7 +145,7 @@ class MultiHeadGAT(nn.Module):
             h_concat = self.norm(h_concat)
 
         return h_concat
-    
+
 class GAT(nn.Module):
     """
     A basic implementation of the GAT layer.
@@ -237,7 +249,10 @@ class GraphUnet(nn.Module):
             A, X = self.unpools[i](A, X, idx)
             X = self.up_gcns[i](A, X)
             X = X.add(down_outs[up_idx])
-        X = torch.cat([X, org_X], 1)
+        X = torch.cat([X, org_X], dim=2)
+        print("moving to end gcn")
+        print(f"end_gcn X: {X.shape}")
+        print(f"end_gcn A: {A.shape}")
         X = self.end_gcn(A, X)
         
-        return X, start_gcn_outs[:, :268]
+        return X, start_gcn_outs[:, :, :268]

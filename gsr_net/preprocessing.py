@@ -21,7 +21,7 @@ def get_device():
 device = get_device()
 
 def pad_HR_adj(label, split):
-
+  print(f"pad_HR_adj label: {label.shape}")
   # label=np.pad(label,((split,split),(split,split)),mode="constant")
   # np.fill_diagonal(label,1)
   # return torch.from_numpy(label).type(torch.FloatTensor)
@@ -31,7 +31,10 @@ def pad_HR_adj(label, split):
   label_padded = F.pad(label, padding, "constant", 0)
 
   # Create an identity matrix of the same size as the padded tensor
-  identity = torch.eye(label_padded.size(0)).to(device)
+  identity = torch.eye(label_padded.size(1)).to(device)
+
+  print(f"pad_HR_adj label_padded: {label_padded.shape}")
+  print(f"pad_HR_adj identity: {identity.shape}")
 
   # Add the identity matrix to the padded tensor to set diagonal elements to 1
   # Assuming the operation intended is to ensure diagonal elements are set to 1 post padding

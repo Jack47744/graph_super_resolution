@@ -266,11 +266,14 @@ def train_gan(
 
 
           mask = torch.ones_like(model_outputs, dtype=torch.bool)
-          mask.fill_diagonal_(0)
+          torch.diagonal(mask, dim1=0, dim2=1).fill_(0) 
+          # mask.fill_diagonal_(0)
 
           filtered_matrix1 = torch.masked_select(model_outputs, mask)
           filtered_matrix2 = torch.masked_select(hr, mask)
 
+          print(f"Train GAN net_outs: {net_outs.shape}")
+          print(f"Train GAN start_gcn_outs: {start_gcn_outs.shape}")
           mse_loss = (
              args.lmbda * criterion(net_outs, start_gcn_outs) 
              + criterion(netG.layer.weights, U_hr) 
@@ -284,11 +287,12 @@ def train_gan(
           error = cal_error(model_outputs, hr, mask)
           real_data = model_outputs.detach()
           
-          total_length = padded_hr.shape[0]
+          print(f"Train GAN padded_hr: {padded_hr.shape}")
+          total_length = padded_hr.shape[1]
           middle_length = args.hr_dim
           start_index = (total_length - middle_length) // 2
           end_index = start_index + middle_length
-          padded_hr = padded_hr[start_index:end_index, start_index:end_index]
+          padded_hr = padded_hr[:, start_index:end_index, start_index:end_index]
 
 
           fake_data = gaussian_noise_layer(padded_hr, args)

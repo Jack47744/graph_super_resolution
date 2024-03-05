@@ -33,7 +33,6 @@ class GSRNet(nn.Module):
 
   def forward(self,lr):
 
-    print(lr.size())
     I = torch.eye(self.lr_dim).type(torch.FloatTensor).to(device)
     I = I.unsqueeze(0).repeat(lr.size(0), 1, 1)
     A = normalize_adj_torch(lr).type(torch.FloatTensor).to(device)
@@ -46,9 +45,10 @@ class GSRNet(nn.Module):
     self.hidden2 = self.gc2(self.hidden1, self.outputs)
 
     z = self.hidden2
-    z = (z + z.t())/2
+    print(f"GSRNet z: {z.shape}")
+    z = (z + z.transpose(1,2))/2
     idx = torch.eye(self.hr_dim, dtype=bool).to(device)
-    z[idx] = 1
+    z[:, idx] = 1
     
     # return torch.abs(z), self.net_outs, self.start_gcn_outs, self.outputs
     return torch.relu(z), self.net_outs, self.start_gcn_outs, self.outputs
@@ -64,7 +64,8 @@ class Dense(nn.Module):
         np.random.seed(1)
         torch.manual_seed(1)
 
-        out = torch.mm(x, self.weights)
+        # out = torch.mm(x, self.weights)
+        out = x @ self.weights
         return out
 
 class Discriminator(nn.Module):
@@ -121,11 +122,14 @@ class Discriminator(nn.Module):
 
 
 def gaussian_noise_layer(input_layer, args):
+    print(f"gaussian_noise_layer input_layer: {input_layer.shape}")
     z = torch.empty_like(input_layer)
+    print(f"gaussian_noise_layer z: {z.shape}")
     noise = z.normal_(mean=args.mean_gaussian, std=args.std_gaussian)
     z = torch.abs(input_layer + noise)
-
-    z = (z + z.t())/2
-    z = z.fill_diagonal_(1)
+    print(f"gaussian_noise_layer z: {z.shape}")
+    z = (z + z.transpose(1,2))/2
+    # z = z.fill_diagonal_(1)
+    torch.diagonal(z, dim1=0, dim2=1).fill_(1) 
     return z
      
