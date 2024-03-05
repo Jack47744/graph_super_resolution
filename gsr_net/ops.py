@@ -30,6 +30,7 @@ class GraphUnpool(nn.Module):
         # print(f"GraphUnpool A: {A.shape}")
         # print(f"GraphUnpool idx: {idx.shape}")
         new_X = torch.zeros([A.shape[0], A.shape[1], X.shape[2]]).to(device)
+        # print(f"GraphUnpool new_X: {new_X.shape}")
         new_X = new_X.scatter_(1, idx.unsqueeze(2).expand(-1, -1, X.shape[2]), X)
         # new_X[idx] = X
         # print(f"GraphUnpool new_X: {new_X.shape}")
@@ -47,7 +48,9 @@ class GraphPool(nn.Module):
     def forward(self, A, X):
         scores = self.proj(X)
         # scores = torch.abs(scores)
-        scores = torch.squeeze(scores)
+        # print(f"GraphPool scores: {scores.shape}")
+        scores = torch.squeeze(scores, dim=2)
+        # print(f"GraphPool scores: {scores.shape}")
         scores = self.sigmoid(scores/100)
         num_nodes = A.shape[1]
         values, idx = torch.topk(scores, int(self.k*num_nodes))
@@ -240,12 +243,18 @@ class GraphUnet(nn.Module):
             adj_ms.append(A)
             down_outs.append(X)
             A, X, idx = self.pools[i](A, X)
+            # print(f"pool A: {A.shape}")
+            # print(f"pool X: {X.shape}")
+            # print(f"pool idx: {idx.shape}")
             indices_list.append(idx)
         
         X = self.bottom_gcn(A, X)
         for i in range(self.l_n):
             up_idx = self.l_n - i - 1
             A, idx = adj_ms[up_idx], indices_list[up_idx]
+            # print(f"unpool A: {A.shape}")
+            # print(f"unpool X: {X.shape}")
+            # print(f"unpool idx: {idx.shape}")
             A, X = self.unpools[i](A, X, idx)
             X = self.up_gcns[i](A, X)
             X = X.add(down_outs[up_idx])

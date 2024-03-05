@@ -79,10 +79,12 @@ cosine_sim_col_loss = ColumnwiseCosineSimilarityLoss()
 device = get_device()
 
 def cal_error(model_outputs, hr, mask):
-   
-   hr = hr.to(device)
-   mask = mask.to(device)
-   return criterion_L1(model_outputs[mask], hr[mask])
+  hr = hr.to(device)
+  mask = mask.to(device)
+  # print(f"cal_error model_outputs: {model_outputs.shape}")
+  # print(f"cal_error hr: {hr.shape}")
+  # print(f"cal_error mask: {mask.shape}")
+  return criterion_L1(model_outputs[mask], hr[mask])
 
 def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, test_ground_truth=None):
   
@@ -372,7 +374,7 @@ def test(model, test_adj, test_labels, args):
   preds_list=[]
   g_t = []
 
-  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool().unsqueeze(0)
   
   i=0
   # TESTING
@@ -390,8 +392,8 @@ def test(model, test_adj, test_labels, args):
         lr = lr.type(torch.FloatTensor)
         hr = hr.type(torch.FloatTensor)
 
-        print(f"Test GAN lr: {lr.shape}")
-        print(f"Test GAN hr: {hr.shape}")
+        # print(f"Test GAN lr: {lr.shape}")
+        # print(f"Test GAN hr: {hr.shape}")
         torch.diagonal(hr, dim1=0, dim2=1).fill_(1)
 
         preds, _, _, _ = model(lr)
@@ -411,6 +413,9 @@ def test(model, test_adj, test_labels, args):
         
         preds_list.append(preds.flatten().cpu().detach().numpy())
         
+        # print(f"Test GAN preds: {preds.shape}")
+        # print(f"Test GAN hr: {hr.shape}")
+        # print(f"Test GAN mask: {mask.shape}")
         # error = criterion_L1(preds, hr)
         error = cal_error(preds, hr, mask)
         g_t.append(hr.flatten())
