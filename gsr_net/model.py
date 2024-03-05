@@ -74,7 +74,7 @@ class Discriminator(nn.Module):
         self.relu_2 = nn.ReLU(inplace=False)
         self.dense_3 = Dense(args.hr_dim, 1, args)
         self.sigmoid = nn.Sigmoid()
-        self.dropout_rate = 0.2
+        self.dropout_rate = args.dropout_rate
 
     def forward(self, x):
         # np.random.seed(1)

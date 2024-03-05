@@ -190,7 +190,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
 
   if test_adj is not None and test_ground_truth is not None:
       test_error = test(model, test_adj, test_ground_truth, args)
-      print(f"Val Error: {test_error:.6f}")
+      # print(f"Val Error: {test_error:.6f}")
 
   return best_model
 
@@ -229,7 +229,9 @@ def train_gan(
 
   mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
 
-  for epoch in tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch'):
+  with tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch') as tepoch:
+    for epoch in tepoch:
+
 
       epoch_loss = []
       epoch_error = []
@@ -330,23 +332,25 @@ def train_gan(
         elif early_stop_count >= early_stop_patient:
           if test_adj is not None and test_ground_truth is not None:
             test_error = test(best_model, test_adj, test_ground_truth, args)
-            print(f"Val Error: {test_error:.6f}")
+            # print(f"Val Error: {test_error:.6f}")
           return best_model
         else: 
           early_stop_count += 1
 
-        tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
-               f'Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}')
-      else:
-         tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
-               f'Train Error: {np.mean(epoch_error):.6f}')
+      tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error), test_error=test_error)
+
+        # tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
+              #  f'Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}')
+      # else:
+        #  tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
+              #  f'Train Error: {np.mean(epoch_error):.6f}')
 
   if not best_model:
       best_model = copy.deepcopy(netG)
 
   if test_adj is not None and test_ground_truth is not None:
       test_error = test(netG, test_adj, test_ground_truth, args)
-      print(f"Val Error: {test_error:.6f}")
+      # print(f"Val Error: {test_error:.6f}")
 
   return best_model
     
