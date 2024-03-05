@@ -272,8 +272,12 @@ def train_gan(
           filtered_matrix1 = torch.masked_select(model_outputs, mask)
           filtered_matrix2 = torch.masked_select(hr, mask)
 
-          print(f"Train GAN net_outs: {net_outs.shape}")
-          print(f"Train GAN start_gcn_outs: {start_gcn_outs.shape}")
+          # print(f"Train GAN net_outs: {net_outs.shape}")
+          # print(f"Train GAN start_gcn_outs: {start_gcn_outs.shape}")
+          print(f"Train GAN U_hr: {U_hr.shape}")
+          print(f"Train GAN netG.layer.weights: {netG.layer.weights.shape}")
+          # print(f"Train GAN filtered_matrix1: {filtered_matrix1.shape}")
+          # print(f"Train GAN filtered_matrix2: {filtered_matrix2.shape}")
           mse_loss = (
              args.lmbda * criterion(net_outs, start_gcn_outs) 
              + criterion(netG.layer.weights, U_hr) 
@@ -287,7 +291,7 @@ def train_gan(
           error = cal_error(model_outputs, hr, mask)
           real_data = model_outputs.detach()
           
-          print(f"Train GAN padded_hr: {padded_hr.shape}")
+          # print(f"Train GAN padded_hr: {padded_hr.shape}")
           total_length = padded_hr.shape[1]
           middle_length = args.hr_dim
           start_index = (total_length - middle_length) // 2

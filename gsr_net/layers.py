@@ -36,13 +36,13 @@ class GSRLayer(nn.Module):
     eye_mat = torch.eye(lr_dim).type(torch.FloatTensor)
     s_d = torch.cat((eye_mat, eye_mat),1).to(device)
 
-    print(f"GSRLayer s_d: {s_d.shape}")
-    print(f"GSRLayer U_lr: {U_lr.shape}")
-    print(f"GSRLayer weights: {self.weights.shape}")
+    # print(f"GSRLayer s_d: {s_d.shape}")
+    # print(f"GSRLayer U_lr: {U_lr.shape}")
+    # print(f"GSRLayer weights: {self.weights.shape}")
     a = torch.matmul(self.weights, s_d.T)
-    print(f"GSRLayer a: {a.shape}")
+    # print(f"GSRLayer a: {a.shape}")
     b = torch.matmul(a ,U_lr)
-    print(f"GSRLayer b: {b.shape}")
+    # print(f"GSRLayer b: {b.shape}")
     # f_d = torch.matmul(b, f)
     # f_d_norm = torch.norm(f_d, dim=1)
     # _, f_d_idx = torch.topk(f_d_norm, self.hr_dim)
@@ -57,20 +57,20 @@ class GSRLayer(nn.Module):
     f_d = torch.matmul(b, f)[:self.hr_dim, :self.hr_dim]
 
 
-    print(f"GSRLayer f_d: {f_d.shape}")
+    # print(f"GSRLayer f_d: {f_d.shape}")
     f_d = torch.abs(f_d)
     # self.f_d = f_d.fill_diagonal_(1)
     torch.diagonal(f_d, dim1=0, dim2=1).fill_(1) 
     self.f_d = f_d
     adj = normalize_adj_torch(self.f_d)
-    print(f"GSRLayer adj: {adj.shape}")
+    # print(f"GSRLayer adj: {adj.shape}")
     X = adj @ adj.transpose(1, 2)
     X = (X + X.transpose(1,2))/2
     idx = torch.eye(self.hr_dim, dtype=bool)    
-    print(f"GSRLayer idx: {idx.shape}")
-    print(f"GSRLayer X: {X.shape}")
+    # print(f"GSRLayer idx: {idx.shape}")
+    # print(f"GSRLayer X: {X.shape}")
     X[:, idx]=1
-    print(adj.size(), X.size())
+    # print(adj.size(), X.size())
     return adj, torch.abs(X)
     
 
@@ -94,10 +94,10 @@ class GraphConvolution(nn.Module):
 
     def forward(self, input, adj):
         # input = F.dropout(input, self.dropout, self.training)
-        print(f"GraphConvolution input: {input.shape}")
-        print(f"GraphConvolution weight: {self.weight.shape}")
+        # print(f"GraphConvolution input: {input.shape}")
+        # print(f"GraphConvolution weight: {self.weight.shape}")
         support = input @ self.weight
-        print(f"GraphConvolution support: {support.shape}")
+        # print(f"GraphConvolution support: {support.shape}")
         output = adj @ support
         # output = torch.mm(adj, support)
         # output = self.act(output)

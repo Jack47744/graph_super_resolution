@@ -21,7 +21,7 @@ def get_device():
 device = get_device()
 
 def pad_HR_adj(label, split):
-  print(f"pad_HR_adj label: {label.shape}")
+  # print(f"pad_HR_adj label: {label.shape}")
   # label=np.pad(label,((split,split),(split,split)),mode="constant")
   # np.fill_diagonal(label,1)
   # return torch.from_numpy(label).type(torch.FloatTensor)
@@ -33,8 +33,8 @@ def pad_HR_adj(label, split):
   # Create an identity matrix of the same size as the padded tensor
   identity = torch.eye(label_padded.size(1)).to(device)
 
-  print(f"pad_HR_adj label_padded: {label_padded.shape}")
-  print(f"pad_HR_adj identity: {identity.shape}")
+  # print(f"pad_HR_adj label_padded: {label_padded.shape}")
+  # print(f"pad_HR_adj identity: {identity.shape}")
 
   # Add the identity matrix to the padded tensor to set diagonal elements to 1
   # Assuming the operation intended is to ensure diagonal elements are set to 1 post padding
@@ -68,8 +68,11 @@ def normalize_adj_torch(mx):
     r_inv_sqrt = torch.pow(rowsum, -0.5)
 
     # Normalize each matrix in the batch: D^(-1/2) * A * D^(-1/2)
-    for i in range(batch_size):
-        mx[i] = torch.matmul(torch.matmul(mx[i], torch.diag(r_inv_sqrt[i])), torch.diag(r_inv_sqrt[i]))
+    # for i in range(batch_size):
+    #     mx[i] = torch.matmul(torch.matmul(mx[i], torch.diag(r_inv_sqrt[i])), torch.diag(r_inv_sqrt[i]))
+
+    r_mat_inv_sqrt = torch.diag_embed(r_inv_sqrt)  # Create diagonal matrices
+    mx = torch.bmm(torch.bmm(mx, r_mat_inv_sqrt), r_mat_inv_sqrt)  # Batch matrix multiply
 
     return mx
 

@@ -26,13 +26,13 @@ class GraphUnpool(nn.Module):
         super(GraphUnpool, self).__init__()
 
     def forward(self, A, X, idx):
-        print(f"GraphUnpool X: {X.shape}")
-        print(f"GraphUnpool A: {A.shape}")
-        print(f"GraphUnpool idx: {idx.shape}")
+        # print(f"GraphUnpool X: {X.shape}")
+        # print(f"GraphUnpool A: {A.shape}")
+        # print(f"GraphUnpool idx: {idx.shape}")
         new_X = torch.zeros([A.shape[0], A.shape[1], X.shape[2]]).to(device)
         new_X = new_X.scatter_(1, idx.unsqueeze(2).expand(-1, -1, X.shape[2]), X)
         # new_X[idx] = X
-        print(f"GraphUnpool new_X: {new_X.shape}")
+        # print(f"GraphUnpool new_X: {new_X.shape}")
         return A, new_X
 
     
@@ -112,14 +112,14 @@ class MultiHeadGAT(nn.Module):
         batch_size, N, _ = adj.size()
 
         for i in range(self.heads):
-            print(f"MultiHeadGAT input: {input.shape}")
-            print(f"MultiHeadGAT weights: {self.weights[i].shape}")
-            print(f"MultiHeadGAT biases: {self.biases[i].shape}")
+            # print(f"MultiHeadGAT input: {input.shape}")
+            # print(f"MultiHeadGAT weights: {self.weights[i].shape}")
+            # print(f"MultiHeadGAT biases: {self.biases[i].shape}")
             x_prime = torch.matmul(input, self.weights[i]) + self.biases[i]
 
-            print(f"MultiHeadGAT x_prime: {x_prime.shape}")
+            # print(f"MultiHeadGAT x_prime: {x_prime.shape}")
             a_input = torch.cat([x_prime.repeat(1, 1, N).view(batch_size, N * N, -1), x_prime.repeat(1, N, 1)], dim=2)
-            print(f"phi: {self.phis[i].shape}")
+            # print(f"phi: {self.phis[i].shape}")
             S = torch.matmul(a_input, self.phis[i]).view(batch_size, N, N)
             S = F.leaky_relu(S, negative_slope=0.2)
             # S = F.gelu(S)
@@ -250,9 +250,9 @@ class GraphUnet(nn.Module):
             X = self.up_gcns[i](A, X)
             X = X.add(down_outs[up_idx])
         X = torch.cat([X, org_X], dim=2)
-        print("moving to end gcn")
-        print(f"end_gcn X: {X.shape}")
-        print(f"end_gcn A: {A.shape}")
+        # print("moving to end gcn")
+        # print(f"end_gcn X: {X.shape}")
+        # print(f"end_gcn A: {A.shape}")
         X = self.end_gcn(A, X)
         
         return X, start_gcn_outs[:, :, :268]
