@@ -272,15 +272,18 @@ def train_gan(
           filtered_matrix1 = torch.masked_select(model_outputs, mask)
           filtered_matrix2 = torch.masked_select(hr, mask)
 
+          # replicating to mathc the batch size
+          layer_weights = netG.layer.weights.repeat(hr.shape[0], 1, 1)
+
           # print(f"Train GAN net_outs: {net_outs.shape}")
           # print(f"Train GAN start_gcn_outs: {start_gcn_outs.shape}")
-          print(f"Train GAN U_hr: {U_hr.shape}")
-          print(f"Train GAN netG.layer.weights: {netG.layer.weights.shape}")
+          # print(f"Train GAN U_hr: {U_hr.shape}")
+          # print(f"Train GAN layer_weights: {layer_weights.shape}")
           # print(f"Train GAN filtered_matrix1: {filtered_matrix1.shape}")
           # print(f"Train GAN filtered_matrix2: {filtered_matrix2.shape}")
           mse_loss = (
              args.lmbda * criterion(net_outs, start_gcn_outs) 
-             + criterion(netG.layer.weights, U_hr) 
+             + criterion(layer_weights, U_hr) 
              + criterion(filtered_matrix1, filtered_matrix2)
             #  + (1 - pearson_coor(filtered_matrix1, filtered_matrix2))
           )
@@ -345,7 +348,7 @@ def train_gan(
         else: 
           early_stop_count += 1
 
-      tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error), test_error=test_error)
+        tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error), test_error=test_error)
 
         # tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
               #  f'Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}')
@@ -373,15 +376,24 @@ def test(model, test_adj, test_labels, args):
   
   i=0
   # TESTING
-  for lr, hr in zip(test_adj,test_labels):
 
-    all_zeros_lr = not np.any(lr)
-    all_zeros_hr = not np.any(hr)
+  test_dataset = torch.utils.data.TensorDataset(torch.from_numpy(test_adj), torch.from_numpy(test_labels))
+  test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+  for lr,hr in test_dataloader:
+    all_zeros_hr = torch.all(hr == 0)
+    all_zeros_lr = torch.all(lr == 0)
+    # all_zeros_lr = not np.any(lr)
+    # all_zeros_hr = not np.any(hr)
     with torch.no_grad():
       if all_zeros_lr == False and all_zeros_hr==False: #choose representative subject
-        lr = torch.from_numpy(lr).type(torch.FloatTensor)
-        np.fill_diagonal(hr, 1)
-        hr = torch.from_numpy(hr).type(torch.FloatTensor)
+        lr = lr.type(torch.FloatTensor)
+        hr = hr.type(torch.FloatTensor)
+
+        print(f"Test GAN lr: {lr.shape}")
+        print(f"Test GAN hr: {hr.shape}")
+        torch.diagonal(hr, dim1=0, dim2=1).fill_(1)
+
         preds, _, _, _ = model(lr)
         preds = preds.to(device)
         # preds = unpad(preds, args.padding)
