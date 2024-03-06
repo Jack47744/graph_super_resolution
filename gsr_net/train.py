@@ -79,6 +79,30 @@ def drop_edges(A, p=0.10):
     A[edges[to_drop, 0], edges[to_drop, 1]] = 0
     A[edges[to_drop, 1], edges[to_drop, 0]] = 0
     return A
+
+def drop_nodes_batch(A_batch, p=0.03, p_perturbe=0.5):
+    '''Randomly drop percent% of nodes (set their rows and columns to zero) for a batch of matrices'''
+    batch_size = A_batch.shape[0]  # Number of matrices in the batch
+    N = A_batch.shape[1]  # Assuming all matrices are square and have the same dimensions
+    for i in range(batch_size):
+        if np.random.rand() < p_perturbe:
+          to_drop = np.random.choice(N, size=int(N * p), replace=False)
+          A_batch[i, to_drop, :] = 0
+          A_batch[i, :, to_drop] = 0
+    return A_batch
+    
+def drop_edges_batch(A_batch, p=0.10, p_perturbe=0.5):
+    '''Randomly drop percent% of edges (set their corresponding entries to zero) for a batch of matrices'''
+    batch_size = A_batch.shape[0]
+    for i in range(batch_size):
+        if np.random.rand() < p_perturbe:
+          N = A_batch.shape[2]
+          E = np.sum(A_batch[i]) / 2
+          edges = np.transpose(np.nonzero(np.triu(A_batch[i])))  # Get the indices of existing edges in the ith matrix
+          to_drop = np.random.choice(edges.shape[0], size=int(E * p), replace=False)
+          A_batch[i, edges[to_drop, 0], edges[to_drop, 1]] = 0
+          A_batch[i, edges[to_drop, 1], edges[to_drop, 0]] = 0
+    return A_batch
    
 
 # criterion = nn.MSELoss()

@@ -31,6 +31,7 @@ class GSRLayer(nn.Module):
     f_d = torch.matmul(b, f)[:self.hr_dim, :self.hr_dim]
     # f_d = torch.abs(f_d)
     f_d = F.leaky_relu(f_d, negative_slope=0.2)
+    # f_d = F.relu(f_d)
 
     # print(f_d.shape)
 
