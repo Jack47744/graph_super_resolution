@@ -64,6 +64,24 @@ def get_upper_triangle(matrix):
     mask = torch.ones(n, n, dtype=torch.bool).triu().fill_diagonal_(False)
     return matrix[mask]
 
+def drop_nodes(A, p=0.03):
+    '''Randomly drop percent% of nodes (set their rows and columns to zero)'''
+    N = A.shape[0]
+    to_drop = np.random.choice(N, size=int(N * p), replace=False)
+    A[to_drop, :] = 0
+    A[:, to_drop] = 0
+    return A
+    
+def drop_edges(A, p=0.10):
+    '''Randomly drop percent% of edges (set their corresponding entries to zero)'''
+    N = A.shape[1]
+    E = np.sum(A) / 2
+    edges = np.transpose(np.nonzero(np.triu(A)))  # Get the indices of existing edges
+    to_drop = np.random.choice(edges.shape[0], size=int(E * p), replace=False)
+    A[edges[to_drop, 0], edges[to_drop, 1]] = 0
+    A[edges[to_drop, 1], edges[to_drop, 0]] = 0
+    return A
+
 
 # criterion = nn.MSELoss()
 criterion = nn.SmoothL1Loss(beta=0.01)
@@ -237,6 +255,11 @@ def train_gan(
       for lr,hr in zip(subjects_adj,subjects_labels):
           optimizerG.zero_grad()
           optimizerD.zero_grad()
+
+          if np.random.rand() < args.p_perturbe:
+              lr = drop_nodes(lr, args.p_drop_node)
+          if np.random.rand() < args.p_perturbe:
+              lr = drop_edges(lr, args.p_drop_edges)
           
           lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
           hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
