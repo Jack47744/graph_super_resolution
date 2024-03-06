@@ -397,23 +397,23 @@ def train_gan(
       
       all_epochs_loss.append(np.mean(epoch_loss))
 
-      if test_adj is not None and test_ground_truth is not None:
-        test_error = test(netG, test_adj, test_ground_truth, args)
+    if test_adj is not None and test_ground_truth is not None:
+      test_error = test(netG, test_adj, test_ground_truth, args)
 
 
-        if test_error < best_mae:
-          best_mae = test_error
-          early_stop_count = 0
-          best_model = copy.deepcopy(netG)
-        elif early_stop_count >= early_stop_patient:
-          if test_adj is not None and test_ground_truth is not None:
-            test_error = test(best_model, test_adj, test_ground_truth, args)
-            # print(f"Val Error: {test_error:.6f}")
-          return best_model
-        else: 
-          early_stop_count += 1
+      if test_error < best_mae:
+        best_mae = test_error
+        early_stop_count = 0
+        best_model = copy.deepcopy(netG)
+      elif early_stop_count >= early_stop_patient:
+        if test_adj is not None and test_ground_truth is not None:
+          test_error = test(best_model, test_adj, test_ground_truth, args)
+          # print(f"Val Error: {test_error:.6f}")
+        return best_model
+      else: 
+        early_stop_count += 1
 
-        tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error), test_error=test_error)
+      tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error), test_error=test_error)
 
         # tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
               #  f'Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}')
