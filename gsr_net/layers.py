@@ -39,17 +39,6 @@ class GSRLayer(nn.Module):
     a = torch.matmul(self.weights, s_d)
     b = torch.matmul(a ,torch.t(U_lr))
 
-    # f_d = torch.matmul(b, f)
-    # f_d_norm = torch.norm(f_d, dim=1)
-    # _, f_d_idx = torch.topk(f_d_norm, self.hr_dim)
-    # f_d = f_d[f_d_idx, :]
-
-    # f_d = torch.matmul(b, f)
-    # total_length = f_d.shape[0]
-    # middle_length = self.hr_dim
-    # start_index = (total_length - middle_length) // 2
-    # end_index = start_index + middle_length
-    # f_d = f_d[start_index:end_index, :]
     # f_d = torch.matmul(b, f)[:self.hr_dim]
     f_d = torch.matmul(b, f)[:self.hr_dim, :self.hr_dim]
     # f_d = torch.abs(f_d)
