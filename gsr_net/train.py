@@ -120,6 +120,10 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
 
       for lr,hr in zip(subjects_adj,subjects_labels):
 
+          if np.random.rand() < args.p_perturbe:
+              lr = drop_nodes(lr, args.p_drop_node)
+          if np.random.rand() < args.p_perturbe:
+              lr = drop_edges(lr, args.p_drop_edges)
           
           model.train()
           optimizer.zero_grad()
@@ -132,8 +136,9 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           padded_hr = pad_HR_adj(hr, args.padding).to(device)
           eig_val_hr, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
 
-          mask = torch.ones_like(model_outputs, dtype=torch.bool)
+          mask = torch.ones_like(model_outputs, dtype=torch.bool).to(device)
           mask.fill_diagonal_(0)
+          U_hr = U_hr.to(device)
 
           filtered_matrix1 = torch.masked_select(model_outputs, mask)
           filtered_matrix2 = torch.masked_select(hr, mask)
