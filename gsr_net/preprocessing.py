@@ -6,11 +6,25 @@ import scipy.io
 path= 'drive/My Drive/BRAIN_DATASET'
 roi_str='ROI_FC.mat'
 
-def pad_HR_adj(label, split):
+import torch.nn.functional as F
 
-  label=np.pad(label,((split,split),(split,split)),mode="constant")
-  np.fill_diagonal(label,1)
-  return torch.from_numpy(label).type(torch.FloatTensor)
+def pad_HR_adj(label, split):
+    
+  # label=np.pad(label,((split,split),(split,split)),mode="constant")
+  # np.fill_diagonal(label,1)
+  # return torch.from_numpy(label).type(torch.FloatTensor)
+
+    label = label.unsqueeze(0)  # Add batch dimension
+    # Pad the tensor. Note: pad takes the last dimension first, hence (split, split) twice.
+    label_padded = F.pad(label, (split, split, split, split), "constant", 0)
+    # Remove batch dimension after padding
+    label_padded = label_padded.squeeze(0)
+    # Fill the diagonal with 1. Ensure to convert label back to its original dtype, if needed.
+    # torch.fill_diagonal_(label_padded, 1)
+    # label_padded.fill_diagonal_(1)
+    diag_indices = torch.arange(label_padded.size(0)).to(label.device)
+    label_padded[diag_indices, diag_indices] = 1
+    return label_padded.type(torch.float)
 
 def normalize_adj_torch(mx):
     # mx = mx.to_dense()

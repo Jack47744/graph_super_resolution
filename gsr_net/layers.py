@@ -22,8 +22,8 @@ class GSRLayer(nn.Module):
     lr_dim = lr.shape[0]
     f = X
     eig_val_lr, U_lr = torch.linalg.eigh(lr, UPLO='U') 
-    eye_mat = torch.eye(lr_dim).type(torch.FloatTensor)
-    s_d = torch.cat((eye_mat, eye_mat),0)
+    eye_mat = torch.eye(lr_dim).type(torch.FloatTensor).to(A.device)
+    s_d = torch.cat((eye_mat, eye_mat), 0).to(A.device)
     
     a = torch.matmul(self.weights, s_d)
     b = torch.matmul(a ,torch.t(U_lr))

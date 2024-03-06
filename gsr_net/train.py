@@ -130,7 +130,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
 
   model = model.to(device)
 
-  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool().to(device)
 
   p_perturbe = 0.50   # prob 0.40 of changing the data
   p_drop_node = 0.03  # 0.03 prob of dropping nodes (in 0.40)
@@ -163,8 +163,10 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
 
             padded_hr = pad_HR_adj(hr, args.padding).to(device)
             eig_val_hr, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
+            U_hr = U_hr.to(device)
+            model_outputs = model_outputs.to(device)
 
-            mask = torch.ones_like(model_outputs, dtype=torch.bool)
+            mask = torch.ones_like(model_outputs, dtype=torch.bool).to(device)
             mask.fill_diagonal_(0)
 
             filtered_matrix1 = torch.masked_select(model_outputs, mask)
@@ -271,7 +273,7 @@ def train_gan(
   netG = netG.to(device)
   netD = netD.to(device)
 
-  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool().to(device)
 
   with tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch') as tepoch:
 
@@ -300,9 +302,11 @@ def train_gan(
             model_outputs, net_outs, start_gcn_outs, layer_outs = netG(lr)
 
             padded_hr = pad_HR_adj(hr, args.padding).to(device)
+            model_outputs = model_outputs.to(device)
             _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
+            U_hr = U_hr.to(device)
 
-            mask = torch.ones_like(model_outputs, dtype=torch.bool)
+            mask = torch.ones_like(model_outputs, dtype=torch.bool).to(device)
             mask.fill_diagonal_(0)
 
             filtered_matrix1 = torch.masked_select(model_outputs, mask)
@@ -391,10 +395,10 @@ def test(model, test_adj, test_labels, args):
 
   model.eval()
   test_error = []
-  preds_list=[]
+  # preds_list=[]
   g_t = []
 
-  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool().to(device)
   
   i=0
   # TESTING
@@ -404,10 +408,11 @@ def test(model, test_adj, test_labels, args):
     all_zeros_hr = not np.any(hr)
     with torch.no_grad():
       if all_zeros_lr == False and all_zeros_hr==False: #choose representative subject
-        lr = torch.from_numpy(lr).type(torch.FloatTensor)
+        lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
         np.fill_diagonal(hr, 1)
-        hr = torch.from_numpy(hr).type(torch.FloatTensor)
+        hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
         preds, _, _, _ = model(lr)
+        preds = preds.to(device)
         # preds = unpad(preds, args.padding)
 
         #plot residuals
@@ -421,7 +426,7 @@ def test(model, test_adj, test_labels, args):
       #     plt.imshow(hr - preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
       #     plt.show(block=False)
         
-        preds_list.append(preds.flatten().detach().numpy())
+        # preds_list.append(preds.flatten().cpu().detach().numpy())
         
         # error = criterion_L1(preds, hr)
         error = cal_error(preds, hr, mask)
