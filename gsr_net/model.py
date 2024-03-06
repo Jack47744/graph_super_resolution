@@ -33,7 +33,7 @@ class GSRNet(nn.Module):
     self.gc1 = GraphConvolution(self.hr_dim, self.hidden_dim, 0, act=F.relu)
     self.gc2 = GraphConvolution(self.hidden_dim, self.hr_dim, 0, act=F.relu)
 
-  def forward(self,lr):
+  def forward(self, lr):
 
     I = torch.eye(self.lr_dim).type(torch.FloatTensor).to(device)
     A = normalize_adj_torch(lr).type(torch.FloatTensor).to(device)
