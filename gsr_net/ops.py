@@ -189,6 +189,7 @@ class GraphUnet(nn.Module):
     def __init__(self, ks, in_dim, out_dim, dim=300):
         super(GraphUnet, self).__init__()
         self.ks = ks
+        dim = out_dim
        
         self.start_gcn = MultiHeadGAT(in_dim, dim)
         # self.bottom_gcn = GAT(dim, dim)
@@ -237,7 +238,11 @@ class GraphUnet(nn.Module):
             A, X = self.unpools[i](A, X, idx)
             X = self.up_gcns[i](A, X)
             X = X.add(down_outs[up_idx])
+        # print(X.shape, org_X.shape)
         X = torch.cat([X, org_X], 1)
+        # print(X.shape)
         X = self.end_gcn(A, X)
         
-        return X, start_gcn_outs[:, :268]
+        # print(X.shape, start_gcn_outs.shape)
+        return X, start_gcn_outs
+        # return X, start_gcn_outs[:, :268]

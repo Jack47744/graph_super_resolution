@@ -118,7 +118,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
       epoch_loss = []
       epoch_error = []
 
-      for lr,hr in zip(subjects_adj,subjects_labels):
+      for lr, hr in zip(subjects_adj,subjects_labels):
 
 
           if np.random.rand() < p_perturbe: 
@@ -143,6 +143,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           filtered_matrix1 = torch.masked_select(model_outputs, mask)
           filtered_matrix2 = torch.masked_select(hr, mask)
         
+          # print(net_outs.shape, start_gcn_outs.shape)
 
           loss = (
              args.lmbda * criterion(net_outs, start_gcn_outs) 

@@ -17,7 +17,7 @@ class GSRLayer(nn.Module):
     self.weights = torch.from_numpy(weight_variable_glorot(lr_dim*2)).type(torch.FloatTensor)
     self.weights = torch.nn.Parameter(data=self.weights, requires_grad = True)
 
-  def forward(self,A,X):
+  def forward(self, A, X):
     lr = A
     lr_dim = lr.shape[0]
     f = X
@@ -27,23 +27,13 @@ class GSRLayer(nn.Module):
     
     a = torch.matmul(self.weights, s_d)
     b = torch.matmul(a ,torch.t(U_lr))
+    
+    f_d = torch.matmul(b, f)[:self.hr_dim, :self.hr_dim]
+    # f_d = torch.abs(f_d)
+    f_d = F.leaky_relu(f_d, negative_slope=0.2)
 
-    # f_d = torch.matmul(b, f)
-    # f_d_norm = torch.norm(f_d, dim=1)
-    # _, f_d_idx = torch.topk(f_d_norm, self.hr_dim)
-    # f_d = f_d[f_d_idx, :]
+    # print(f_d.shape)
 
-    # f_d = torch.matmul(b, f)
-    # total_length = f_d.shape[0]
-    # middle_length = self.hr_dim
-    # start_index = (total_length - middle_length) // 2
-    # end_index = start_index + middle_length
-    # f_d = f_d[start_index:end_index, :]
-    f_d = torch.matmul(b, f)[:self.hr_dim]
-
-
-
-    f_d = torch.abs(f_d)
     self.f_d = f_d.fill_diagonal_(1)
     adj = normalize_adj_torch(self.f_d)
     X = torch.mm(adj, adj.t())
