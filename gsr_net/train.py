@@ -369,7 +369,6 @@ def test(model, test_adj, test_labels, args):
 
   model.eval()
   test_error = []
-  preds_list=[]
   g_t = []
 
   mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
@@ -387,41 +386,14 @@ def test(model, test_adj, test_labels, args):
         hr = torch.from_numpy(hr).type(torch.FloatTensor)
         preds, _, _, _ = model(lr)
         preds = preds.to(device)
-        # preds = unpad(preds, args.padding)
 
-        #plot residuals
-      #   if i==0:
-      #     print ("Hr", hr)     
-      #     print("Preds  ", preds)
-      #     plt.imshow(hr, origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-      #     plt.show(block=False)
-      #     plt.imshow(preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-      #     plt.show(block=False)
-      #     plt.imshow(hr - preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-      #     plt.show(block=False)
-        
-        preds_list.append(preds.flatten().cpu().detach().numpy())
-        
-        # error = criterion_L1(preds, hr)
         error = cal_error(preds, hr, mask)
         g_t.append(hr.flatten())
-        # print(error.item())
         test_error.append(error.item())
       
         i+=1
-  # print ("Test error MSE: ", np.mean(test_error))
   return np.mean(test_error)
   
-  #plot histograms
-#   preds_list = [val for sublist in preds_list for val in sublist]
-#   g_t_list = [val for sublist in g_t for val in sublist]
-#   binwidth = 0.01
-#   bins=np.arange(0, 1 + binwidth, binwidth)
-#   plt.hist(preds_list, bins =bins,range=(0,1),alpha=0.5,rwidth=0.9, label='predictions')
-#   plt.hist(g_t_list, bins=bins,range=(0,1),alpha=0.5,rwidth=0.9, label='ground truth')
-#   plt.xlim(xmin=0, xmax = 1)
-#   plt.legend(loc='upper right')
-#   plt.title('GSR-Net with self reconstruction: Histogram')
-#   plt.show(block=False)
+
 
 
