@@ -138,7 +138,14 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
       epoch_loss = []
       epoch_error = []
 
+      p_perturbe = 0.50   # prob 0.40 of changing the data
+      p_drop_node = 0.03  # 0.03 prob of dropping nodes (in 0.40)
+      p_drop_edges = 0.10 # 0.10 prob of dropping edges (in 0.40)
+
       for lr,hr in zip(subjects_adj,subjects_labels):
+          
+          lr = drop_nodes_batch(lr.detach().clone(), p_perturbe=p_perturbe, p_drop_node=p_drop_node)
+          lr = drop_edges_batch(lr, p_perturbe=p_perturbe, p_drop_edges=p_drop_edges)
 
           
           model.train()
