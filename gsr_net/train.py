@@ -29,6 +29,39 @@ def pearson_coor(input, target):
     vy = target - torch.mean(target)
     cost = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)))
     return cost
+
+import numpy as np
+
+import torch 
+
+def drop_nodes_batch(A_batch, p_perturbe, p_drop_node=0.03):
+    """Randomly drops nodes in a batch of adjacency matrices (PyTorch tensors)."""
+
+    batch_size, N, _ = A_batch.size()
+    for i in range(batch_size):  
+        if torch.rand(1) < p_perturbe:
+            to_drop = torch.randperm(N)[:int(N * p_drop_node)] 
+            A_batch[i, to_drop, :] = 0 
+            A_batch[i, :, to_drop] = 0   
+    return A_batch
+
+def drop_edges_batch(A_batch, p_perturbe, p_drop_edges=0.10):
+    """Randomly drops edges in a batch of adjacency matrices (PyTorch tensors)."""
+
+    batch_size, N, _ = A_batch.size()
+    for i in range(batch_size):
+        if torch.rand(1) < p_perturbe:
+            E = A_batch[i].sum() / 2  # Number of edges 
+            edges = (A_batch[i].triu() > 0).nonzero(as_tuple=True)
+            num_edges_to_drop = int(E * p_drop_edges)
+            to_drop = torch.randperm(edges[0].size(0))[:num_edges_to_drop]
+
+            # Set the selected edges to zero in both directions
+            A_batch[i, edges[0][to_drop], edges[1][to_drop]] = 0
+            A_batch[i, edges[1][to_drop], edges[0][to_drop]] = 0  
+    return A_batch
+
+
     
 class CosineSimilarityAllLoss(nn.Module):
     def __init__(self):
@@ -227,6 +260,11 @@ def train_gan(
   best_model = None
   batch_size = args.batch_size
 
+  p_perturbe = 0.50   # prob 0.40 of changing the data
+  p_drop_node = 0.03  # 0.03 prob of dropping nodes (in 0.40)
+  p_drop_edges = 0.10 # 0.10 prob of dropping edges (in 0.40)
+  print(p_perturbe, p_drop_node, p_drop_edges)
+
   netG = netG.to(device)
   netD = netD.to(device)
 
@@ -251,6 +289,9 @@ def train_gan(
           # if i % 10 == 0:
           optimizerG.zero_grad()
           optimizerD.zero_grad()
+
+          lr = drop_nodes_batch(lr.detach().clone(), p_perturbe, p_drop_node)
+          lr = drop_edges_batch(lr, p_perturbe, p_drop_edges)   
 
           lr = lr.type(torch.FloatTensor).to(device)
           hr = hr.type(torch.FloatTensor).to(device)
