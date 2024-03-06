@@ -267,9 +267,9 @@ def train_gan(
   best_model = None
   batch_size = args.batch_size
 
-  p_perturbe = 0.50   # prob 0.40 of changing the data
-  p_drop_node = 0.03  # 0.03 prob of dropping nodes (in 0.40)
-  p_drop_edges = 0.10 # 0.10 prob of dropping edges (in 0.40)
+  p_perturbe = args.p_perturbe   # prob 0.40 of changing the data
+  p_drop_node = args.p_drop_node  # 0.03 prob of dropping nodes (in 0.40)
+  p_drop_edges = args.p_drop_edges # 0.10 prob of dropping edges (in 0.40)
   print(p_perturbe, p_drop_node, p_drop_edges)
 
   netG = netG.to(device)
