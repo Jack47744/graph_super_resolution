@@ -4,16 +4,13 @@ import numpy as np
 import torch.nn.functional as F
 from layers import GCNLayer
 
-import os
-os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-
 def get_device():
     # Check for CUDA GPU
     if torch.cuda.is_available():
         return torch.device("cuda")
     # Check for Apple MPS (requires PyTorch 1.12 or later)
-    # elif torch.backends.mps.is_available():
-    #     return torch.device("mps")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
     # Fallback to CPU
     else:
         return torch.device("cpu")

@@ -12,8 +12,8 @@ def get_device():
     if torch.cuda.is_available():
         return torch.device("cuda")
     # Check for Apple MPS (requires PyTorch 1.12 or later)
-    # elif torch.backends.mps.is_available():
-    #     return torch.device("mps")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
     # Fallback to CPU
     else:
         return torch.device("cpu")

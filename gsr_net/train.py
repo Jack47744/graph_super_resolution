@@ -16,8 +16,8 @@ def get_device():
     if torch.cuda.is_available():
         return torch.device("cuda")
     # Check for Apple MPS (requires PyTorch 1.12 or later)
-    # elif torch.backends.mps.is_available():
-    #     return torch.device("mps")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
     # Fallback to CPU
     else:
         return torch.device("cpu")
@@ -29,7 +29,7 @@ def pearson_coor(input, target):
     vy = target - torch.mean(target)
     cost = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)))
     return cost
-    
+
 class CosineSimilarityAllLoss(nn.Module):
     def __init__(self):
         super(CosineSimilarityAllLoss, self).__init__()
@@ -65,8 +65,6 @@ def get_upper_triangle(matrix):
     return matrix[mask]
 
 
-   
-
 # criterion = nn.MSELoss()
 criterion = nn.SmoothL1Loss(beta=0.01)
 # criterion = nn.L1Loss()
@@ -79,10 +77,9 @@ cosine_sim_col_loss = ColumnwiseCosineSimilarityLoss()
 device = get_device()
 
 def cal_error(model_outputs, hr, mask):
-   
-   hr = hr.to(device)
-   mask = mask.to(device)
-   return criterion_L1(model_outputs[mask], hr[mask])
+  hr = hr.to(device)
+  mask = mask.to(device)
+  return criterion_L1(model_outputs[mask], hr[mask])
 
 def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, test_ground_truth=None):
   
@@ -231,24 +228,15 @@ def train_gan(
 
   with tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch') as tepoch:
     for epoch in tepoch:
-
-
       epoch_loss = []
       epoch_error = []
-
-      # lossD = 0
-      # lossG = 0
-      # i = 0
 
       netG.train()
       netD.train()
 
       for lr,hr in zip(subjects_adj,subjects_labels):
-          
-          # if i % 10 == 0:
           optimizerG.zero_grad()
           optimizerD.zero_grad()
-
           
           lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
           hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
