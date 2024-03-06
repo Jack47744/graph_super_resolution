@@ -34,32 +34,47 @@ import numpy as np
 
 import torch 
 
-def drop_nodes_batch(A_batch, p_perturbe, p_drop_node=0.03):
-    """Randomly drops nodes in a batch of adjacency matrices (PyTorch tensors)."""
+class GraphDataset(torch.utils.data.Dataset):
+    def __init__(self, subjects_adj, subjects_labels, p_perturbe, p_drop_node, p_drop_edges):
+        self.subjects_adj = subjects_adj
+        self.subjects_labels = subjects_labels
+        self.p_perturbe = p_perturbe
+        self.p_drop_node = p_drop_node
+        self.p_drop_edges = p_drop_edges
 
-    batch_size, N, _ = A_batch.size()
-    for i in range(batch_size):  
-        if torch.rand(1) < p_perturbe:
-            to_drop = torch.randperm(N)[:int(N * p_drop_node)] 
-            A_batch[i, to_drop, :] = 0 
-            A_batch[i, :, to_drop] = 0   
-    return A_batch
+    def __len__(self):
+        return len(self.subjects_adj)
 
-def drop_edges_batch(A_batch, p_perturbe, p_drop_edges=0.10):
-    """Randomly drops edges in a batch of adjacency matrices (PyTorch tensors)."""
+    def __getitem__(self, idx):
+        lr = self.subjects_adj[idx]
+        hr = self.subjects_labels[idx]
 
-    batch_size, N, _ = A_batch.size()
-    for i in range(batch_size):
-        if torch.rand(1) < p_perturbe:
-            E = A_batch[i].sum() / 2  # Number of edges 
-            edges = (A_batch[i].triu() > 0).nonzero(as_tuple=True)
-            num_edges_to_drop = int(E * p_drop_edges)
-            to_drop = torch.randperm(edges[0].size(0))[:num_edges_to_drop]
+        # print('lr_size: ', lr.size())
 
-            # Set the selected edges to zero in both directions
-            A_batch[i, edges[0][to_drop], edges[1][to_drop]] = 0
-            A_batch[i, edges[1][to_drop], edges[0][to_drop]] = 0  
-    return A_batch
+        if torch.rand(1) < self.p_perturbe:
+          lr = drop_nodes(lr.detach().clone(), self.p_drop_node)
+        if torch.rand(1) < self.p_perturbe:
+          lr = drop_edges(lr, self.p_drop_edges)
+
+        return lr, hr
+
+def drop_nodes(A, p=0.03):
+    '''Randomly drop percent% of nodes (set their rows and columns to zero)'''
+    N = A.shape[0]
+    to_drop = torch.multinomial(torch.ones(N), int(N * p), replacement=False)
+    A[to_drop, :] = 0
+    A[:, to_drop] = 0
+    return A
+    
+def drop_edges(A, p=0.10):
+    '''Randomly drop percent% of edges (set their corresponding entries to zero)'''
+    N = A.shape[1]
+    E = torch.sum(A) / 2
+    edges = torch.nonzero(torch.triu(A), as_tuple=True) 
+    to_drop = torch.multinomial(torch.ones(edges[0].shape[0]), int(E * p), replacement=False)
+    A[edges[0][to_drop], edges[1][to_drop]] = 0
+    A[edges[1][to_drop], edges[0][to_drop]] = 0
+    return A
 
 
     
@@ -138,14 +153,14 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
       epoch_loss = []
       epoch_error = []
 
-      p_perturbe = 0.50   # prob 0.40 of changing the data
-      p_drop_node = 0.03  # 0.03 prob of dropping nodes (in 0.40)
-      p_drop_edges = 0.10 # 0.10 prob of dropping edges (in 0.40)
+      # p_perturbe = 0.50   # prob 0.40 of changing the data
+      # p_drop_node = 0.03  # 0.03 prob of dropping nodes (in 0.40)
+      # p_drop_edges = 0.10 # 0.10 prob of dropping edges (in 0.40)
 
       for lr,hr in zip(subjects_adj,subjects_labels):
           
-          lr = drop_nodes_batch(lr.detach().clone(), p_perturbe=p_perturbe, p_drop_node=p_drop_node)
-          lr = drop_edges_batch(lr, p_perturbe=p_perturbe, p_drop_edges=p_drop_edges)
+          # lr = drop_nodes_batch(lr.detach().clone(), p_perturbe=p_perturbe, p_drop_node=p_drop_node)
+          # lr = drop_edges_batch(lr, p_perturbe=p_perturbe, p_drop_edges=p_drop_edges)
 
           
           model.train()
@@ -287,8 +302,8 @@ def train_gan(
       netG.train()
       netD.train()
 
-      dataset = torch.utils.data.TensorDataset(torch.from_numpy(subjects_adj), torch.from_numpy(subjects_labels))
-      dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+      dataset = GraphDataset(torch.from_numpy(subjects_adj), torch.from_numpy(subjects_labels), p_perturbe, p_drop_node, p_drop_edges)
+      dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4) # default is 0
 
       for lr,hr in dataloader:
           
@@ -297,8 +312,8 @@ def train_gan(
           optimizerG.zero_grad()
           optimizerD.zero_grad()
 
-          lr = drop_nodes_batch(lr.detach().clone(), p_perturbe, p_drop_node)
-          lr = drop_edges_batch(lr, p_perturbe, p_drop_edges)   
+          # lr = drop_nodes_batch(lr.detach().clone(), p_perturbe, p_drop_node)
+          # lr = drop_edges_batch(lr, p_perturbe, p_drop_edges)   
 
           lr = lr.type(torch.FloatTensor).to(device)
           hr = hr.type(torch.FloatTensor).to(device)
