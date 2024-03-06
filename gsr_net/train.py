@@ -259,161 +259,152 @@ def train_gan(
       test_ground_truth=None
 ):
   
-  all_epochs_loss = []
-  no_epochs = args.epochs
-  best_mae = np.inf
-  early_stop_patient = args.early_stop_patient
-  early_stop_count = 0
-  best_model = None
-  batch_size = args.batch_size
+    all_epochs_loss = []
+    no_epochs = args.epochs
+    best_mae = np.inf
+    early_stop_patient = args.early_stop_patient
+    early_stop_count = 0
+    best_model = None
+    batch_size = args.batch_size
+    
+    p_perturbe = args.p_perturbe   # prob 0.40 of changing the data
+    p_drop_node = args.p_drop_node  # 0.03 prob of dropping nodes (in 0.40)
+    p_drop_edges = args.p_drop_edges # 0.10 prob of dropping edges (in 0.40)
+    print(p_perturbe, p_drop_node, p_drop_edges)
+    
+    netG = netG.to(device)
+    netD = netD.to(device)
+    
+    mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
 
-  p_perturbe = args.p_perturbe   # prob 0.40 of changing the data
-  p_drop_node = args.p_drop_node  # 0.03 prob of dropping nodes (in 0.40)
-  p_drop_edges = args.p_drop_edges # 0.10 prob of dropping edges (in 0.40)
-  print(p_perturbe, p_drop_node, p_drop_edges)
-
-  netG = netG.to(device)
-  netD = netD.to(device)
-
-  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
-
-  with tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch') as tepoch:
-    for epoch in tepoch:
-
-
-      epoch_loss = []
-      epoch_error = []
-
-      netG.train()
-      netD.train()
-
-      dataset = torch.utils.data.TensorDataset(torch.from_numpy(subjects_adj), torch.from_numpy(subjects_labels))
-      dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-      for lr,hr in dataloader:
+    with tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch') as tepoch:
+        for epoch in tepoch:
+    
+            epoch_loss = []
+            epoch_error = []
+            
+            netG.train()
+            netD.train()
+            
+            dataset = torch.utils.data.TensorDataset(torch.from_numpy(subjects_adj), torch.from_numpy(subjects_labels))
+            dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    
+            for lr,hr in dataloader:
+                
+                # if i % 10 == 0:
+                optimizerG.zero_grad()
+                optimizerD.zero_grad()
+                
+                # lr = drop_nodes_batch(lr.detach().clone(), p_perturbe, p_drop_node)
+                # lr = drop_edges_batch(lr, p_perturbe, p_drop_edges)   
+                
+                lr = lr.type(torch.FloatTensor).to(device)
+                hr = hr.type(torch.FloatTensor).to(device)
+                
+                model_outputs, net_outs, start_gcn_outs, layer_outs = netG(lr)
+                model_outputs = model_outputs.to(device)
+                start_gcn_outs = start_gcn_outs.to(device)
+                hr = hr.to(device)
+                net_outs = net_outs.to(device)
+                
+                padded_hr = pad_HR_adj(hr, args.padding)
+                padded_hr = padded_hr.to(device)
+                _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
+                U_hr = U_hr.to(device)
+                
+                
+                mask = torch.ones_like(model_outputs, dtype=torch.bool)
+                torch.diagonal(mask, dim1=0, dim2=1).fill_(0) 
+                # mask.fill_diagonal_(0)
+                
+                filtered_matrix1 = torch.masked_select(model_outputs, mask)
+                filtered_matrix2 = torch.masked_select(hr, mask)
+                
+                # replicating to mathc the batch size
+                layer_weights = netG.layer.weights.repeat(hr.shape[0], 1, 1)
+                
+                # print(f"Train GAN net_outs: {net_outs.shape}")
+                # print(f"Train GAN start_gcn_outs: {start_gcn_outs.shape}")
+                # print(f"Train GAN U_hr: {U_hr.shape}")
+                # print(f"Train GAN layer_weights: {layer_weights.shape}")
+                # print(f"Train GAN filtered_matrix1: {filtered_matrix1.shape}")
+                # print(f"Train GAN filtered_matrix2: {filtered_matrix2.shape}")
+                mse_loss = (
+                 args.lmbda * criterion(net_outs, start_gcn_outs) 
+                 + criterion(layer_weights, U_hr) 
+                 + criterion(filtered_matrix1, filtered_matrix2)
+                #  + (1 - pearson_coor(filtered_matrix1, filtered_matrix2))
+                )
+                
+                # Discriminator Update
+                
+                # error = criterion_L1(model_outputs, hr)
+                error = cal_error(model_outputs, hr, mask)
+                real_data = model_outputs.detach()
+                
+                # print(f"Train GAN padded_hr: {padded_hr.shape}")
+                total_length = padded_hr.shape[1]
+                middle_length = args.hr_dim
+                start_index = (total_length - middle_length) // 2
+                end_index = start_index + middle_length
+                padded_hr = padded_hr[:, start_index:end_index, start_index:end_index]
+                
+                
+                fake_data = gaussian_noise_layer(padded_hr, args)
+                
+                # d_real = netD(get_upper_triangle(real_data))
+                # d_fake = netD(get_upper_triangle(fake_data))
+                
+                d_real = netD(real_data)
+                d_fake = netD(fake_data)
+                
+                dc_loss_real = bce_loss(d_real, torch.ones_like(d_real))
+                dc_loss_fake = bce_loss(d_fake, torch.zeros_like(d_real))
+                dc_loss = dc_loss_real + dc_loss_fake
+                
+                dc_loss.backward()
+                optimizerD.step()
+                
+                # Generator Update
+                
+                # d_fake = netD(get_upper_triangle(gaussian_noise_layer(padded_hr, args)))
+                d_fake = netD(gaussian_noise_layer(padded_hr, args))
+                
+                gen_loss = bce_loss(d_fake, torch.ones_like(d_fake))
+                generator_loss = gen_loss + mse_loss
+                generator_loss.backward()
+                optimizerG.step()
+                
+                epoch_loss.append(generator_loss.item())
+                epoch_error.append(error.item())
           
-        
-          # if i % 10 == 0:
-          optimizerG.zero_grad()
-          optimizerD.zero_grad()
-
-          lr = drop_nodes_batch(lr.detach().clone(), p_perturbe, p_drop_node)
-          lr = drop_edges_batch(lr, p_perturbe, p_drop_edges)   
-
-          lr = lr.type(torch.FloatTensor).to(device)
-          hr = hr.type(torch.FloatTensor).to(device)
-          
-          model_outputs, net_outs, start_gcn_outs, layer_outs = netG(lr)
-          model_outputs = model_outputs.to(device)
-          start_gcn_outs = start_gcn_outs.to(device)
-          hr = hr.to(device)
-          net_outs = net_outs.to(device)
-
-          padded_hr = pad_HR_adj(hr, args.padding)
-          padded_hr = padded_hr.to(device)
-          _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
-          U_hr = U_hr.to(device)
-
-
-          mask = torch.ones_like(model_outputs, dtype=torch.bool)
-          torch.diagonal(mask, dim1=0, dim2=1).fill_(0) 
-          # mask.fill_diagonal_(0)
-
-          filtered_matrix1 = torch.masked_select(model_outputs, mask)
-          filtered_matrix2 = torch.masked_select(hr, mask)
-
-          # replicating to mathc the batch size
-          layer_weights = netG.layer.weights.repeat(hr.shape[0], 1, 1)
-
-          # print(f"Train GAN net_outs: {net_outs.shape}")
-          # print(f"Train GAN start_gcn_outs: {start_gcn_outs.shape}")
-          # print(f"Train GAN U_hr: {U_hr.shape}")
-          # print(f"Train GAN layer_weights: {layer_weights.shape}")
-          # print(f"Train GAN filtered_matrix1: {filtered_matrix1.shape}")
-          # print(f"Train GAN filtered_matrix2: {filtered_matrix2.shape}")
-          mse_loss = (
-             args.lmbda * criterion(net_outs, start_gcn_outs) 
-             + criterion(layer_weights, U_hr) 
-             + criterion(filtered_matrix1, filtered_matrix2)
-            #  + (1 - pearson_coor(filtered_matrix1, filtered_matrix2))
-          )
-          
-          # Discriminator Update
-
-          # error = criterion_L1(model_outputs, hr)
-          error = cal_error(model_outputs, hr, mask)
-          real_data = model_outputs.detach()
-          
-          # print(f"Train GAN padded_hr: {padded_hr.shape}")
-          total_length = padded_hr.shape[1]
-          middle_length = args.hr_dim
-          start_index = (total_length - middle_length) // 2
-          end_index = start_index + middle_length
-          padded_hr = padded_hr[:, start_index:end_index, start_index:end_index]
-
-
-          fake_data = gaussian_noise_layer(padded_hr, args)
-
-          # d_real = netD(get_upper_triangle(real_data))
-          # d_fake = netD(get_upper_triangle(fake_data))
-
-          d_real = netD(real_data)
-          d_fake = netD(fake_data)
-
-          dc_loss_real = bce_loss(d_real, torch.ones_like(d_real))
-          dc_loss_fake = bce_loss(d_fake, torch.zeros_like(d_real))
-          dc_loss = dc_loss_real + dc_loss_fake
-
-          dc_loss.backward()
-          optimizerD.step()
-
-          # Generator Update
-
-          # d_fake = netD(get_upper_triangle(gaussian_noise_layer(padded_hr, args)))
-          d_fake = netD(gaussian_noise_layer(padded_hr, args))
-
-          gen_loss = bce_loss(d_fake, torch.ones_like(d_fake))
-          generator_loss = gen_loss + mse_loss
-          generator_loss.backward()
-          optimizerG.step()
-
-          epoch_loss.append(generator_loss.item())
-          epoch_error.append(error.item())
-      
-      all_epochs_loss.append(np.mean(epoch_loss))
-
-      if test_adj is not None and test_ground_truth is not None:
+            all_epochs_loss.append(np.mean(epoch_loss))
+    
+            if test_adj is not None and test_ground_truth is not None:
+                test_error = test(netG, test_adj, test_ground_truth, args)
+    
+            if test_error < best_mae:
+                best_mae = test_error
+                early_stop_count = 0
+                best_model = copy.deepcopy(netG)
+            elif early_stop_count >= early_stop_patient:
+                if test_adj is not None and test_ground_truth is not None:
+                    test_error = test(best_model, test_adj, test_ground_truth, args)
+                    return best_model
+            else: 
+                early_stop_count += 1
+            if test_adj is not None and test_ground_truth is not None:
+                tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error), test_error=test_error)
+            else:
+                tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error))
+    
+    if not best_model:
+        best_model = copy.deepcopy(netG)
+    
+    if test_adj is not None and test_ground_truth is not None:
         test_error = test(netG, test_adj, test_ground_truth, args)
-
-
-        if test_error < best_mae:
-          best_mae = test_error
-          early_stop_count = 0
-          best_model = copy.deepcopy(netG)
-        elif early_stop_count >= early_stop_patient:
-          if test_adj is not None and test_ground_truth is not None:
-            test_error = test(best_model, test_adj, test_ground_truth, args)
-            # print(f"Val Error: {test_error:.6f}")
-          return best_model
-        else: 
-          early_stop_count += 1
-
-        tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error), test_error=test_error)
-
-        # tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
-              #  f'Train Error: {np.mean(epoch_error):.6f}, Test Error: {test_error:.6f}')
-      # else:
-        #  tqdm.write(f'Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, '
-              #  f'Train Error: {np.mean(epoch_error):.6f}')
-
-  if not best_model:
-      best_model = copy.deepcopy(netG)
-
-  if test_adj is not None and test_ground_truth is not None:
-      test_error = test(netG, test_adj, test_ground_truth, args)
-      # print(f"Val Error: {test_error:.6f}")
-
-  return best_model
+    
+    return best_model
     
 def test(model, test_adj, test_labels, args):
 
