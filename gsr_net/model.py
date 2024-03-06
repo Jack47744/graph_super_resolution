@@ -27,7 +27,7 @@ class GSRNet(nn.Module):
     self.hr_dim = args.hr_dim
     self.hidden_dim = args.hidden_dim
     self.layer = GSRLayer(self.lr_dim, self.hr_dim)
-    self.net = GraphUnet(ks, self.lr_dim, self.hr_dim)
+    self.net = GraphUnet(ks, self.lr_dim, self.hr_dim, args.hidden_gat_dim)
     self.gc1 = GraphConvolution(self.hr_dim, self.hidden_dim, 0, act=F.relu)
     self.gc2 = GraphConvolution(self.hidden_dim, self.hr_dim, 0, act=F.relu)
 
