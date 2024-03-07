@@ -132,7 +132,13 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           padded_hr = pad_HR_adj(hr, args.padding).to(device)
           eig_val_hr, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
 
-          mask = torch.ones_like(model_outputs, dtype=torch.bool)
+          U_hr = U_hr.to(device)
+          model_outputs = model_outputs.to(device)
+          net_outs = net_outs.to(device)
+          start_gcn_outs = start_gcn_outs.to(device)
+          
+
+          mask = torch.ones_like(model_outputs, dtype=torch.bool).to(device)
           mask.fill_diagonal_(0)
 
           filtered_matrix1 = torch.masked_select(model_outputs, mask)

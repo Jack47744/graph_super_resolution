@@ -164,17 +164,17 @@ class GAT(nn.Module):
         x_prime = input @ self.weight  + self.bias
 
         N = adj.size(0)
-        a_input = torch.cat([x_prime.repeat(1, N).view(N * N, -1), x_prime.repeat(N, 1)], dim=1)
+        a_input = torch.cat([x_prime.repeat(1, N).view(N * N, -1), x_prime.repeat(N, 1)], dim=1).to(adj.device)
         S = (a_input @ self.phi).view(N, N)
         S = F.leaky_relu(S, negative_slope=0.2)
 
-        mask = (adj + torch.eye(adj.size(0))) > 0
+        mask = (adj + torch.eye(adj.size(0)).to(adj.device)) > 0
         S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
         attention = F.softmax(S_masked, dim=1)
         h = attention @ x_prime
 
-        if self.residual:
-            h = input + h
+        # if self.residual:
+        #     h = input + h
 
         if self.activation:
             h = self.activation(h)
@@ -187,10 +187,10 @@ class GraphUnet(nn.Module):
         super(GraphUnet, self).__init__()
         self.ks = ks
        
-        self.start_gcn = MultiHeadGAT(in_dim, dim)
+        self.start_gcn = GAT(in_dim, dim)
         # self.bottom_gcn = GAT(dim, dim)
-        self.bottom_gcn = MultiHeadGAT(dim, dim, residual=True)
-        self.end_gcn = MultiHeadGAT(2*dim, out_dim)
+        self.bottom_gcn = GAT(dim, dim, residual=True)
+        self.end_gcn = GAT(2*dim, out_dim)
         self.down_gcns = []
         self.up_gcns = []
         self.pools = []
@@ -199,8 +199,8 @@ class GraphUnet(nn.Module):
 
         # self.down_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
         # self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
-        self.down_gcns = nn.ModuleList([MultiHeadGAT(dim, dim, residual=True) for i in range(self.l_n)])
-        self.up_gcns = nn.ModuleList([MultiHeadGAT(dim, dim, residual=True) for i in range(self.l_n)])
+        self.down_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
+        self.up_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=3, padding=1, bias=True) for _ in range(self.l_n)])
