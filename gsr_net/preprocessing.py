@@ -1,16 +1,43 @@
 import torch
 import numpy as np
 import os
-import scipy.io 
+import scipy.io
+import torch
+import torch.nn.functional as F 
 
 path= 'drive/My Drive/BRAIN_DATASET'
 roi_str='ROI_FC.mat'
 
+def get_device():
+    # Check for CUDA GPU
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    # Check for Apple MPS (requires PyTorch 1.12 or later)
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    # Fallback to CPU
+    else:
+        return torch.device("cpu")
+device = get_device()
+
 def pad_HR_adj(label, split):
 
-  label=np.pad(label,((split,split),(split,split)),mode="constant")
-  np.fill_diagonal(label,1)
-  return torch.from_numpy(label).type(torch.FloatTensor)
+  # label=np.pad(label,((split,split),(split,split)),mode="constant")
+  # np.fill_diagonal(label,1)
+  # return torch.from_numpy(label).type(torch.FloatTensor)
+
+  # Pad the tensor
+  padding = (split, split, split, split)  # Padding for left, right, top, bottom
+  label_padded = F.pad(label, padding, "constant", 0)
+
+  # Create an identity matrix of the same size as the padded tensor
+  identity = torch.eye(label_padded.size(0)).to(device)
+
+  # Add the identity matrix to the padded tensor to set diagonal elements to 1
+  # Assuming the operation intended is to ensure diagonal elements are set to 1 post padding
+  label_padded = label_padded + identity
+
+  return label_padded.type(torch.FloatTensor)
 
 def normalize_adj_torch(mx):
     # mx = mx.to_dense()

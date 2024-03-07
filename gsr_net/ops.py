@@ -11,8 +11,8 @@ def get_device():
     if torch.cuda.is_available():
         return torch.device("cuda")
     # Check for Apple MPS (requires PyTorch 1.12 or later)
-    # elif torch.backends.mps.is_available():
-    #     return torch.device("mps")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
     # Fallback to CPU
     else:
         return torch.device("cpu")
@@ -76,7 +76,7 @@ class GAT(nn.Module):
     allowing the model to focus on different parts of the neighborhood
     of each node.
     """
-    def __init__(self, in_features, out_features, activation = None):
+    def __init__(self, in_features, out_features, activation = None, residual = False):
         super(GAT, self).__init__()
         # Initialize the weights, bias, and attention parameters as
         # trainable parameters
@@ -85,6 +85,7 @@ class GAT(nn.Module):
         self.phi = nn.Parameter(torch.FloatTensor(2 * out_features, 1))
         self.activation = activation
         self.reset_parameters()
+        self.residual = residual
 
     def reset_parameters(self):
         stdv = 1. / np.sqrt(self.weight.size(1))
@@ -123,14 +124,20 @@ class GAT(nn.Module):
         S = (a_input @ self.phi).view(N, N)
         S = F.leaky_relu(S, negative_slope=0.2)
 
-        mask = (adj + torch.eye(adj.size(0))) > 0
+        mask = (adj + torch.eye(adj.size(0), device = device)) > 0
         S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
         attention = F.softmax(S_masked, dim=1)
         # print(attention.shape, x_prime.shape)
         h = attention @ x_prime
 
+        if self.activation:
+            h = self.activation(h)
+
+        if self.residual:
+            h = input + h
+
         #########################################
-        return self.activation(h) if self.activation else h
+        return h
 
 
 class GraphUnet(nn.Module):
@@ -138,9 +145,11 @@ class GraphUnet(nn.Module):
     def __init__(self, ks, in_dim, out_dim, dim=300):
         super(GraphUnet, self).__init__()
         self.ks = ks
+
+        dim = out_dim
        
         self.start_gcn = GAT(in_dim, dim)
-        self.bottom_gcn = GAT(dim, dim)
+        self.bottom_gcn = GAT(dim, dim, residual=True)
         self.end_gcn = GAT(2*dim, out_dim)
         self.down_gcns = []
         self.up_gcns = []
@@ -150,8 +159,8 @@ class GraphUnet(nn.Module):
 
         # self.down_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
         # self.up_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
-        self.down_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
-        self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
+        self.down_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
+        self.up_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
         self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=3, padding=1, bias=True) for _ in range(self.l_n)])

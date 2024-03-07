@@ -6,6 +6,7 @@ from preprocessing import *
 from model import *
 import copy
 import torch.optim as optim
+from tqdm import tqdm
 
 
 
@@ -14,11 +15,13 @@ def get_device():
     if torch.cuda.is_available():
         return torch.device("cuda")
     # Check for Apple MPS (requires PyTorch 1.12 or later)
-    # elif torch.backends.mps.is_available():
-    #     return torch.device("mps")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
     # Fallback to CPU
     else:
         return torch.device("cpu")
+
+device = get_device()
     
 class CosineSimilarityAllLoss(nn.Module):
     def __init__(self):
@@ -65,12 +68,15 @@ def drop_edges(A, p=0.10):
     A[edges[to_drop, 0], edges[to_drop, 1]] = 0
     A[edges[to_drop, 1], edges[to_drop, 0]] = 0
     return A
-    
+
+def cal_error(model_outputs, hr, mask):
+   return criterion_L1(model_outputs[mask], hr[mask])
 
 # criterion = nn.MSELoss()
 criterion = nn.SmoothL1Loss(beta=0.01)
 criterion_L1 = nn.L1Loss()
 kl_loss = nn.KLDivLoss()
+bce_loss =  nn.BCELoss()
 cosine_sim_all_loss = CosineSimilarityAllLoss()
 cosine_sim_col_loss = ColumnwiseCosineSimilarityLoss()
 
@@ -88,32 +94,44 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
 
   model = model.to(device)
 
+  p_perturbe = args.p_perturbe   # prob 0.40 of changing the data
+  p_drop_node = args.p_drop_node  # 0.03 prob of dropping nodes (in 0.40)
+  p_drop_edges = args.p_drop_edges # 0.10 prob of dropping edges (in 0.40)
+  print(p_perturbe, p_drop_node, p_drop_edges)
+
   for epoch in range(no_epochs):
 
       epoch_loss = []
       epoch_error = []
+      
 
       for lr,hr in zip(subjects_adj,subjects_labels):
 
           
           model.train()
           optimizer.zero_grad()
+          
+          
 
-          if np.random.rand() < 0.40: # prob 0.40 of changing the data
-            lr = drop_nodes(lr.copy(), p = 0.03) # 0.03 prob of dropping nodes (in 0.40)
-            lr = drop_edges(lr, p = 0.10) # 0.10 prob of dropping edges (in 0.40)
+          if np.random.rand() < p_perturbe: 
+            lr = drop_nodes(lr.copy(), p = p_drop_node)
+            lr = drop_edges(lr, p = p_drop_edges) 
           
           lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
           hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
           
           model_outputs, net_outs, start_gcn_outs, layer_outs = model(lr)
+
+          model_outputs = model_outputs.to(device)
+          start_gcn_outs = start_gcn_outs.to(device)
+          hr = hr.to(device)
+          net_outs = net_outs.to(device)
           # model_outputs  = unpad(model_outputs, args.padding)
 
-          padded_hr = pad_HR_adj(hr, args.padding).to(device)
-          eig_val_hr, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
-          # print(net_outs.size(),start_gcn_outs.size())
-          # print(model.layer.weights.size(), U_hr.size())
-          # print(model_outputs.size(), hr.size())
+          padded_hr = pad_HR_adj(hr, args.padding)
+          padded_hr = padded_hr.to(device)
+          _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
+          U_hr = U_hr.to(device)
 
           mask = torch.ones_like(model_outputs, dtype=torch.bool)
           mask.fill_diagonal_(0)
@@ -129,8 +147,7 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
             #  + cosine_sim_col_loss(model.layer.weights, U_hr) 
           )
           
-          error = criterion_L1(model_outputs, hr)
-          # error_L1 = criterion_L1(model_outputs, hr)
+          error = cal_error(model_outputs, hr, mask)
           
           loss.backward()
           optimizer.step()
@@ -182,89 +199,114 @@ def get_node_embedding(A, embedding_size):
     return node_embeddings
 
 def train_gan(
-    netG, 
-    optimizerG, 
-    netD,
-    optimizerD,
-    subjects_adj, 
-    subjects_labels, 
-    args, 
-    test_adj=None, 
-    test_ground_truth=None
+      netG, 
+      optimizerG,
+      netD,
+      optimizerD,
+      subjects_adj, 
+      subjects_labels, 
+      args, 
+      test_adj=None, 
+      test_ground_truth=None
 ):
   
-    all_epochs_loss = []
-    no_epochs = args.epochs
-    best_mae = np.inf
-    early_stop_patient = 3
-    early_stop_count = 0
-    best_model = None
+  all_epochs_loss = []
+  no_epochs = args.epochs
+  best_mae = np.inf
+  early_stop_patient = args.early_stop_patient
+  early_stop_count = 0
+  best_model = None
 
-    
-    # netD = Discriminator(input_dim = 256, hidden_dim_list=[256, 128])
-    # optimizerD = optim.Adam(netD.parameters(), lr=args.lr)
-    bce_loss = nn.BCELoss()
+  netG = netG.to(device)
+  netD = netD.to(device)
 
-    netG = netG.to(device)
-    netD = netD.to(device)
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
 
-    for epoch in range(no_epochs):
+  with tqdm(range(no_epochs), desc='Epoch Progress', unit='epoch') as tepoch:
+
+    for epoch in tepoch:
 
         epoch_loss = []
         epoch_error = []
 
-        for lr, hr in zip(subjects_adj, subjects_labels):
+        # lossD = 0
+        # lossG = 0
+        # i = 0
+
+        netG.train()
+        netD.train()
+
+        for lr,hr in zip(subjects_adj, subjects_labels):
             
-            # Prep Data
+            # if i % 10 == 0:
+            optimizerG.zero_grad()
+            optimizerD.zero_grad()
+
+            
             lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
             hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
+            
+            model_outputs, net_outs, start_gcn_outs, layer_outs = netG(lr)
+
             padded_hr = pad_HR_adj(hr, args.padding).to(device)
-            _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U')
+            _, U_hr = torch.linalg.eigh(padded_hr, UPLO='U') 
             U_hr = U_hr.to(device)
+            model_outputs = model_outputs.to(device)
+            net_outs = net_outs.to(device)
+            start_gcn_outs = start_gcn_outs.to(device)
 
-      
-            hr_node_embeddings = get_node_embedding(hr, args.embedding_size).to(device)
-            
-            ############################
-            # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-            ###########################
-            netD.train()
-            optimizerD.zero_grad()
-            
-            output = netD(hr, hr_node_embeddings).view(-1)
-            errD_real = bce_loss(output, torch.ones_like(output).to(device))
-            errD_real.backward()
+            mask = torch.ones_like(model_outputs, dtype=torch.bool).to(device)
+            mask.fill_diagonal_(0)
 
-            fake, net_outs, start_gcn_outs, layer_outs = netG(lr)
-            fake_hr_node_embeddings = get_node_embedding(fake, args.embedding_size).to(device)
+            filtered_matrix1 = torch.masked_select(model_outputs, mask)
+            filtered_matrix2 = torch.masked_select(hr, mask)
 
-            output = netD(hr, fake_hr_node_embeddings.detach()).view(-1)
-            errD_fake = bce_loss(output, torch.zeros_like(output).to(device))
-            errD_fake.backward()
-            
-            optimizerD.step()
-
-            ############################
-            # (2) Update G network: maximize log(D(G(z)))
-            ###########################
-            netG.train()
-            optimizerG.zero_grad()
-            output = netD(hr, fake_hr_node_embeddings).view(-1)
-            errG = bce_loss(output, torch.ones_like(output).to(device))
-            
-            loss = (
+            mse_loss = (
               args.lmbda * criterion(net_outs, start_gcn_outs) 
               + criterion(netG.layer.weights, U_hr) 
-              + criterion(fake, hr)
-              + errG
+              + criterion(filtered_matrix1, filtered_matrix2)
+              #  + (1 - pearson_coor(filtered_matrix1, filtered_matrix2))
             )
-
-            loss.backward()
-            optimizerG.step()
             
-            error = criterion_L1(fake, hr)
+            # Discriminator Update
 
-            epoch_loss.append(loss.item())
+            # error = criterion_L1(model_outputs, hr)
+            error = cal_error(model_outputs, hr, mask)
+            real_data = model_outputs.detach()
+            
+            total_length = padded_hr.shape[0]
+            middle_length = args.hr_dim
+            start_index = (total_length - middle_length) // 2
+            end_index = start_index + middle_length
+            padded_hr = padded_hr[start_index:end_index, start_index:end_index]
+
+
+            fake_data = gaussian_noise_layer(padded_hr, args)
+
+            # d_real = netD(get_upper_triangle(real_data))
+            # d_fake = netD(get_upper_triangle(fake_data))
+
+            d_real = netD(real_data)
+            d_fake = netD(fake_data)
+
+            dc_loss_real = bce_loss(d_real, torch.ones_like(d_real))
+            dc_loss_fake = bce_loss(d_fake, torch.zeros_like(d_real))
+            dc_loss = dc_loss_real + dc_loss_fake
+
+            dc_loss.backward()
+            optimizerD.step()
+
+            # Generator Update
+
+            # d_fake = netD(get_upper_triangle(gaussian_noise_layer(padded_hr, args)))
+            d_fake = netD(gaussian_noise_layer(padded_hr, args))
+
+            gen_loss = bce_loss(d_fake, torch.ones_like(d_fake))
+            generator_loss = gen_loss + mse_loss
+            generator_loss.backward()
+            optimizerG.step()
+
+            epoch_loss.append(generator_loss.item())
             epoch_error.append(error.item())
         
         all_epochs_loss.append(np.mean(epoch_loss))
@@ -281,41 +323,31 @@ def train_gan(
             if test_adj is not None and test_ground_truth is not None:
               test_error = test(best_model, test_adj, test_ground_truth, args)
               print(f"Val Error: {test_error:.6f}")
-            return netG
+            return best_model
           else: 
             early_stop_count += 1
 
-          train_loss = f"{np.mean(epoch_loss):.6f}"
-          train_error = f"{np.mean(epoch_error):.6}"
-          test_error = f"{test_error:.6f}"
-
-          print(
-              f"Epoch: {epoch+1}, Train Loss: {train_loss}, Train Error: {train_error},  Test Error: {test_error}"
-          )
+          tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error), test_error=test_error)
         else:
-          print(f"Epoch: {epoch+1}, Train Loss: {np.mean(epoch_loss):.6f}, Train Error: {train_error}")
+          tepoch.set_postfix(train_loss=np.mean(epoch_loss), train_error=np.mean(epoch_error))
 
-    if not best_model:
-        best_model = netG
+  if not best_model:
+      best_model = copy.deepcopy(netG)
 
-    if test_adj is not None and test_ground_truth is not None:
-        test_error = test(netG, test_adj, test_ground_truth, args)
-        print(f"Val Error: {test_error:.6f}")
+  if test_adj is not None and test_ground_truth is not None:
+      test_error = test(netG, test_adj, test_ground_truth, args)
+      print(f"Val Error: {test_error:.6f}")
 
-    if best_model:
-        return best_model
-    return netG
-
-#   plt.plot(all_epochs_loss)
-#   plt.title('GSR-UNet with self reconstruction: Loss')
-#   plt.show(block=False)
+  return best_model
     
-def test(model, test_adj, test_labels,args):
+def test(model, test_adj, test_labels, args):
 
   model.eval()
   test_error = []
-  preds_list=[]
+  # preds_list=[]
   g_t = []
+
+  mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool().to(device)
   
   i=0
   # TESTING
@@ -325,26 +357,16 @@ def test(model, test_adj, test_labels,args):
     all_zeros_hr = not np.any(hr)
     with torch.no_grad():
       if all_zeros_lr == False and all_zeros_hr==False: #choose representative subject
-        lr = torch.from_numpy(lr).type(torch.FloatTensor)
+        lr = torch.from_numpy(lr).type(torch.FloatTensor).to(device)
         np.fill_diagonal(hr, 1)
-        hr = torch.from_numpy(hr).type(torch.FloatTensor)
-        preds,a,b,c = model(lr)
-        # preds = unpad(preds, args.padding)
-
-        #plot residuals
-      #   if i==0:
-      #     print ("Hr", hr)     
-      #     print("Preds  ", preds)
-      #     plt.imshow(hr, origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-      #     plt.show(block=False)
-      #     plt.imshow(preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-      #     plt.show(block=False)
-      #     plt.imshow(hr - preds.detach(), origin = 'upper',  extent = [-0.5, 268-0.5, 268-0.5, -0.5])
-      #     plt.show(block=False)
+        hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
+        preds, _, _, _ = model(lr)
+        preds = preds.to(device)
         
-        preds_list.append(preds.flatten().detach().numpy())
+        # preds_list.append(preds.flatten().cpu().detach().numpy())
         
-        error = criterion_L1(preds, hr)
+        # error = criterion_L1(preds, hr)
+        error = cal_error(preds, hr, mask)
         g_t.append(hr.flatten())
         # print(error.item())
         test_error.append(error.item())
@@ -352,17 +374,3 @@ def test(model, test_adj, test_labels,args):
         i+=1
   # print ("Test error MSE: ", np.mean(test_error))
   return np.mean(test_error)
-  
-  #plot histograms
-#   preds_list = [val for sublist in preds_list for val in sublist]
-#   g_t_list = [val for sublist in g_t for val in sublist]
-#   binwidth = 0.01
-#   bins=np.arange(0, 1 + binwidth, binwidth)
-#   plt.hist(preds_list, bins =bins,range=(0,1),alpha=0.5,rwidth=0.9, label='predictions')
-#   plt.hist(g_t_list, bins=bins,range=(0,1),alpha=0.5,rwidth=0.9, label='ground truth')
-#   plt.xlim(xmin=0, xmax = 1)
-#   plt.legend(loc='upper right')
-#   plt.title('GSR-Net with self reconstruction: Histogram')
-#   plt.show(block=False)
-
-
