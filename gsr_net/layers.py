@@ -48,15 +48,22 @@ class GSRLayer(nn.Module):
     f_d = F.leaky_relu(f_d, negative_slope=0.2)
 
 
-    f_d = torch.abs(f_d)
+    # f_d = torch.abs(f_d)
     self.f_d = f_d.fill_diagonal_(1)
     adj = normalize_adj_torch(self.f_d)
+
+      
+    # adj = F.leaky_relu(adj, negative_slope=0.2)  #
+    
+    
     X = torch.mm(adj, adj.t())
     X = (X + X.t())/2
     idx = torch.eye(self.hr_dim, dtype=bool)    
-    X[idx]=1
+    X[idx] = 1
     # print(adj.size(), X.size())
     return adj, torch.abs(X)
+    # return adj, torch.square(X)
+    # return adj, X
     
 
 

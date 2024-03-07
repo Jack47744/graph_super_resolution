@@ -111,8 +111,6 @@ def train(model, optimizer, subjects_adj, subjects_labels, args, test_adj=None, 
           model.train()
           optimizer.zero_grad()
           
-          
-
           if np.random.rand() < p_perturbe: 
             lr = drop_nodes(lr.copy(), p = p_drop_node)
             lr = drop_edges(lr, p = p_drop_edges) 
@@ -207,7 +205,8 @@ def train_gan(
       subjects_labels, 
       args, 
       test_adj=None, 
-      test_ground_truth=None
+      test_ground_truth=None,
+      stop_gan_mae=None,
 ):
   
   all_epochs_loss = []
@@ -267,8 +266,6 @@ def train_gan(
               + criterion(filtered_matrix1, filtered_matrix2)
               #  + (1 - pearson_coor(filtered_matrix1, filtered_matrix2))
             )
-            
-            # Discriminator Update
 
             # error = criterion_L1(model_outputs, hr)
             error = cal_error(model_outputs, hr, mask)
@@ -280,29 +277,33 @@ def train_gan(
             end_index = start_index + middle_length
             padded_hr = padded_hr[start_index:end_index, start_index:end_index]
 
-
-            fake_data = gaussian_noise_layer(padded_hr, args)
-
-            # d_real = netD(get_upper_triangle(real_data))
-            # d_fake = netD(get_upper_triangle(fake_data))
-
-            d_real = netD(real_data)
-            d_fake = netD(fake_data)
-
-            dc_loss_real = bce_loss(d_real, torch.ones_like(d_real))
-            dc_loss_fake = bce_loss(d_fake, torch.zeros_like(d_real))
-            dc_loss = dc_loss_real + dc_loss_fake
-
-            dc_loss.backward()
-            optimizerD.step()
+            if stop_gan_mae is None or best_mae >= stop_gan_mae:
+                fake_data = gaussian_noise_layer(padded_hr, args)
+    
+                # d_real = netD(get_upper_triangle(real_data))
+                # d_fake = netD(get_upper_triangle(fake_data))
+    
+                d_real = netD(real_data)
+                d_fake = netD(fake_data)
+    
+                dc_loss_real = bce_loss(d_real, torch.ones_like(d_real))
+                dc_loss_fake = bce_loss(d_fake, torch.zeros_like(d_real))
+                dc_loss = dc_loss_real + dc_loss_fake
+    
+                dc_loss.backward()
+                optimizerD.step()
 
             # Generator Update
 
-            # d_fake = netD(get_upper_triangle(gaussian_noise_layer(padded_hr, args)))
-            d_fake = netD(gaussian_noise_layer(padded_hr, args))
+            if stop_gan_mae is None or best_mae >= stop_gan_mae:
+                d_fake = netD(gaussian_noise_layer(padded_hr, args))
+    
+                gen_loss = bce_loss(d_fake, torch.ones_like(d_fake))
+                generator_loss = gen_loss + mse_loss
+            else:
+                generator_loss = criterion(filtered_matrix1, filtered_matrix2)
 
-            gen_loss = bce_loss(d_fake, torch.ones_like(d_fake))
-            generator_loss = gen_loss + mse_loss
+            
             generator_loss.backward()
             optimizerG.step()
 
@@ -339,6 +340,7 @@ def train_gan(
       print(f"Val Error: {test_error:.6f}")
 
   return best_model
+
     
 def test(model, test_adj, test_labels, args):
 

@@ -86,6 +86,7 @@ class GAT(nn.Module):
         self.activation = activation
         self.reset_parameters()
         self.residual = residual
+        self.out_features = out_features
 
     def reset_parameters(self):
         stdv = 1. / np.sqrt(self.weight.size(1))
@@ -134,6 +135,7 @@ class GAT(nn.Module):
             h = self.activation(h)
 
         if self.residual:
+            # print(input.shape, h.shape)
             h = input + h
 
         #########################################
@@ -148,28 +150,20 @@ class GraphUnet(nn.Module):
 
         dim = out_dim
        
-        self.start_gcn = GAT(in_dim, dim)
-        self.bottom_gcn = GAT(dim, dim, residual=True)
-        self.end_gcn = GAT(2*dim, out_dim)
+        self.start_gcn = GAT(in_dim, dim, activation=F.leaky_relu)
+        self.bottom_gcn = GAT(dim, dim, residual=True, activation=F.leaky_relu)
+        self.end_gcn = GAT(2*dim, out_dim, activation=F.leaky_relu)
         self.down_gcns = []
         self.up_gcns = []
         self.pools = []
         self.unpools = []
         self.l_n = len(ks)
 
-        # self.down_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
-        # self.up_gcns = nn.ModuleList([GCN(dim, dim) for i in range(self.l_n)])
-        self.down_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
-        self.up_gcns = nn.ModuleList([GAT(dim, dim, residual=True) for i in range(self.l_n)])
+        self.down_gcns = nn.ModuleList([GAT(dim, dim, residual=True, activation=F.leaky_relu) for i in range(self.l_n)])
+        self.up_gcns = nn.ModuleList([GAT(dim, dim, residual=True, activation=F.leaky_relu) for i in range(self.l_n)])
+        # self.up_gcns = nn.ModuleList([GAT(2*dim, dim, residual=True, activation=F.relu) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
-        self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=3, padding=1, bias=True) for _ in range(self.l_n)])
-
-        # for i in range(self.l_n):
-        #     self.down_gcns.append(GCN(dim, dim))
-        #     self.up_gcns.append(GCN(dim, dim))
-        #     self.pools.append(GraphPool(ks[i], dim))
-        #     self.unpools.append(GraphUnpool())
 
     def forward(self, A, X):
         # print('start_gcn device: ', self.start_gcn.device)
@@ -192,15 +186,17 @@ class GraphUnet(nn.Module):
             up_idx = self.l_n - i - 1
             A, idx = adj_ms[up_idx], indices_list[up_idx]
             A, X = self.unpools[i](A, X, idx)
+
+            # Start Edit
+            # X = torch.cat([X, down_outs[up_idx]], 1)
+            # X = self.up_gcns[i](A, X)
+            # End Edit
+
+            # Start Before Edit
             X = self.up_gcns[i](A, X)
-
-            # # X = torch.stack([X, down_outs[up_idx]], dim=0).unsqueeze(0)
-            # # X = self.convs[i](X).squeeze()
-            # X = torch.cat((X.unsqueeze(0), down_outs[up_idx].unsqueeze(0)), dim=0).unsqueeze(0)
-            # # print(X.shape)
-            # X = self.convs[i](X).squeeze(0).squeeze(0)
-
             X = X.add(down_outs[up_idx])
+            # End Before Edit
+        
         X = torch.cat([X, org_X], 1)
         X = self.end_gcn(A, X)
         
