@@ -87,7 +87,7 @@ class GAT(nn.Module):
         self.reset_parameters()
         self.residual = residual
         self.out_features = out_features
-
+        
     def reset_parameters(self):
         stdv = 1. / np.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)

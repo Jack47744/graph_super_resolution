@@ -6,7 +6,7 @@ from preprocessing import *
 from model import *
 import copy
 import torch.optim as optim
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 
 
