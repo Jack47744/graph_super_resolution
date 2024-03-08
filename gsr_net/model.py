@@ -28,8 +28,8 @@ class GSRNet(nn.Module):
     self.hidden_dim = args.hidden_dim
     self.layer = GSRLayer(self.lr_dim, self.hidden_dim)
     self.net = GraphUnet(ks, self.lr_dim, self.hr_dim)
-    self.gc1 = GraphConvolution(self.hr_dim, self.hidden_dim, 0, act=F.relu)
-    self.gc2 = GraphConvolution(self.hidden_dim, self.hr_dim, 0, act=F.relu)
+    self.gc1 = GraphConvolution(self.hr_dim, self.hidden_dim, 0, act=F.leaky_relu)
+    self.gc2 = GraphConvolution(self.hidden_dim, self.hr_dim, 0, act=F.leaky_relu)
 
 
   def forward(self,lr):
@@ -49,7 +49,7 @@ class GSRNet(nn.Module):
     idx = torch.eye(self.hr_dim, dtype=bool).to(device)
     z[idx] = 1
     
-    return torch.relu(z), self.net_outs, self.start_gcn_outs, self.outputs
+    return F.leaky_relu(z), self.net_outs, self.start_gcn_outs, self.outputs
 
 class Dense(nn.Module):
     def __init__(self, n1, n2, args):
@@ -69,9 +69,9 @@ class Discriminator(nn.Module):
     def __init__(self, args):
         super(Discriminator, self).__init__()
         self.dense_1 = Dense(args.hr_dim, args.hr_dim, args)
-        self.relu_1 = nn.ReLU(inplace=False)
+        self.relu_1 = nn.LeakyReLU(negative_slope=0.2)
         self.dense_2 = Dense(args.hr_dim, args.hr_dim, args)
-        self.relu_2 = nn.ReLU(inplace=False)
+        self.relu_2 = nn.LeakyReLU(negative_slope=0.2)
         self.dense_3 = Dense(args.hr_dim, 1, args)
         self.sigmoid = nn.Sigmoid()
         self.dropout_rate = 0.2

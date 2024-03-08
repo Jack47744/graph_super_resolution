@@ -72,7 +72,7 @@ class GraphConvolution(nn.Module):
     Simple GCN layer, similar to https://arxiv.org/abs/1609.02907
     """
     #160x320 320x320 =  160x320
-    def __init__(self, in_features, out_features, dropout=0., act=F.relu):
+    def __init__(self, in_features, out_features, dropout=0., act=F.leaky_relu):
         super(GraphConvolution, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -106,4 +106,4 @@ class GCNLayer(nn.Module):
     def forward(self, H_k, A_normalized):
         agg = torch.matmul(A_normalized, H_k)
         H_k_next = torch.matmul(agg, self.Omega) + self.beta
-        return F.relu(H_k_next) if self.use_nonlinearity else H_k_next
+        return F.leaky_relu(H_k_next) if self.use_nonlinearity else H_k_next

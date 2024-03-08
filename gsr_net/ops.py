@@ -35,6 +35,7 @@ class GraphPool(nn.Module):
     def __init__(self, k, in_dim):
         super(GraphPool, self).__init__()
         self.k = k
+        self.scale = nn.Parameter(torch.tensor([0.01]))
         self.proj = nn.Linear(in_dim, 1)
         self.sigmoid = nn.Sigmoid()
 
@@ -42,7 +43,7 @@ class GraphPool(nn.Module):
         scores = self.proj(X)
         # scores = torch.abs(scores)
         scores = torch.squeeze(scores)
-        scores = self.sigmoid(scores/100)
+        scores = self.sigmoid(scores * self.scale)
         num_nodes = A.shape[0]
         values, idx = torch.topk(scores, int(self.k*num_nodes))
         new_X = X[idx, :]
