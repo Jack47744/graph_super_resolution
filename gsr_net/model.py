@@ -49,7 +49,7 @@ class GSRNet(nn.Module):
     idx = torch.eye(self.hr_dim, dtype=bool).to(device)
     z[idx] = 1
     
-    return F.leaky_relu(z), self.net_outs, self.start_gcn_outs, self.outputs
+    return torch.relu(z), self.net_outs, self.start_gcn_outs, self.outputs
 
 class Dense(nn.Module):
     def __init__(self, n1, n2, args):
