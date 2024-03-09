@@ -29,7 +29,6 @@ class GraphUnpool(nn.Module):
         new_X[idx] = X
         return A, new_X
 
-    
 class GraphPool(nn.Module):
 
     def __init__(self, k, in_dim):
