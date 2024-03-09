@@ -364,6 +364,7 @@ def test(model, test_adj, test_labels, args):
         hr = torch.from_numpy(hr).type(torch.FloatTensor).to(device)
         preds, _, _, _ = model(lr)
         preds = preds.to(device)
+        preds = torch.clamp(preds, min=0.0, max=1.0)  
         
         # preds_list.append(preds.flatten().cpu().detach().numpy())
         
