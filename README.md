@@ -17,7 +17,7 @@ Conventional equipment designed for detailed brain connectivity capture is often
 Our Super-AGSR-Net is the enhance version of the AGSR-Net. Inspired by the transformer model, we employ the attention network with the residual connection in Graph U-Net to capture varying node importance and long-range dependencies between non-neighbours. On the other hand, the discriminator’s residual connection helps counteract the vanishing gradients of the deep discriminator, allowing more efficient training. With an improved discriminator, Super-AGSR-Net’s generator receives better training feedback, encouraging it to produce a more accurate graph.
 
 
-![AGR-Net pipeline](/imgs/gnn_chart2.png)
+![AGR-Net pipeline](/imgs/gnn_chart2.jpg)
 
 ## Used External Libraries
 
