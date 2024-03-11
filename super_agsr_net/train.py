@@ -47,7 +47,6 @@ def train_gan(
     :param stop_gan_mae: The mean absolute error to stop the GAN training
     :return: The trained GAN model"""
 
-    print("inside Training GAN")
     all_epochs_loss = []
     no_epochs = args.epochs  # Number of epochs for training
     best_mae = np.inf  # Initialize best mean absolute error
