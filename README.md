@@ -6,7 +6,7 @@
 - Wutikorn Ratanapan (wr323@ic.ac.uk)
 - Carlos Brat (cb1223@ic.ac.uk)
 - Marios Charalambides (mc1122@ic.ac.uk)
-- Aryan Agrawal ()
+- Aryan Agrawal (aa6923@ic.ac.uk)
 
 ## Problem Description
 
@@ -20,13 +20,16 @@
 
 ## Used External Libraries
 
-- Give instructions on how to install the external libraries if you have used any in your code.
+To set up your environment for the project, you will need to install `networkx`, `optuna`, and `torch`.
+
+```bash
+pip install -q networkx optuna torch  
+```
 
 ## Results
-
-- Insert your bar plots.
+![AGR-Net pipeline](/imgs/bar_plot.png)
+From the bar chart in 3-fold cross validation.
 
 
 ## References
-
 - Do not forget to include the references to methods you used to build your model.
