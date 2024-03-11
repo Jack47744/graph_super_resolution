@@ -2,20 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
-
-import os
-os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-
-def get_device():
-    # Check for CUDA GPU
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    # Check for Apple MPS (requires PyTorch 1.12 or later)
-    elif torch.backends.mps.is_available():
-        return torch.device("mps")
-    # Fallback to CPU
-    else:
-        return torch.device("cpu")
+from  utils import get_device
 
 device = get_device()
 
@@ -39,7 +26,6 @@ class GraphPool(nn.Module):
 
     def forward(self, A, X):
         scores = self.proj(X)
-        # scores = torch.abs(scores)
         scores = torch.squeeze(scores)
         scores = self.sigmoid(scores/100)
         num_nodes = A.shape[0]
@@ -60,8 +46,6 @@ class GCN(nn.Module):
         self.drop = nn.Dropout(p=0)
 
     def forward(self, A, X):
-        # print(X.device)
-        # print(self.proj.weight.device)
         X = self.drop(X)
         X = torch.matmul(A, X)
         X = self.proj(X)
@@ -77,8 +61,6 @@ class GAT(nn.Module):
     """
     def __init__(self, in_features, out_features, activation = None, residual = False):
         super(GAT, self).__init__()
-        # Initialize the weights, bias, and attention parameters as
-        # trainable parameters
         self.weight = nn.Parameter(torch.FloatTensor(in_features, out_features))
         self.bias = nn.Parameter(torch.zeros(out_features))
         self.phi = nn.Parameter(torch.FloatTensor(2 * out_features, 1))
@@ -105,18 +87,6 @@ class GAT(nn.Module):
         Returns:
         Tensor: The output features of the nodes after applying the GAT layer.
         """
-        ############# Your code here ############
-        ## 1. Apply linear transformation and add bias
-        ## 2. Compute the attention scores utilizing the previously
-        ## established mechanism.
-        ## Note: Keep in mind that employing matrix notation can
-        ## optimize this process.
-        ## 3. Compute mask based on adjacency matrix
-        ## 4. Apply mask to the pre-attention matrix
-        ## 5. Compute attention weights using softmax
-        ## 6. Aggregate features based on attention weights
-        ## Note: name the last line as `h`
-        ## (9-10 lines of code)
         x_prime = input @ self.weight  + self.bias
 
         N = adj.size(0)
@@ -127,17 +97,14 @@ class GAT(nn.Module):
         mask = (adj + torch.eye(adj.size(0), device = device)) > 0
         S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
         attention = F.softmax(S_masked, dim=1)
-        # print(attention.shape, x_prime.shape)
         h = attention @ x_prime
 
         if self.activation:
             h = self.activation(h)
 
         if self.residual:
-            # print(input.shape, h.shape)
             h = input + h
 
-        #########################################
         return h
 
 
@@ -146,9 +113,8 @@ class GraphUnet(nn.Module):
     def __init__(self, ks, in_dim, out_dim, dim=300):
         super(GraphUnet, self).__init__()
         self.ks = ks
-
         dim = out_dim
-       
+
         self.start_gcn = GAT(in_dim, dim, activation=F.leaky_relu)
         self.bottom_gcn = GAT(dim, dim, residual=True, activation=F.leaky_relu)
         self.end_gcn = GAT(2*dim, out_dim, activation=F.leaky_relu)
@@ -160,12 +126,10 @@ class GraphUnet(nn.Module):
 
         self.down_gcns = nn.ModuleList([GAT(dim, dim, residual=True, activation=F.leaky_relu) for i in range(self.l_n)])
         self.up_gcns = nn.ModuleList([GAT(dim, dim, residual=True, activation=F.leaky_relu) for i in range(self.l_n)])
-        # self.up_gcns = nn.ModuleList([GAT(2*dim, dim, residual=True, activation=F.relu) for i in range(self.l_n)])
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
 
     def forward(self, A, X):
-        # print('start_gcn device: ', self.start_gcn.device)
         adj_ms = []
         indices_list = []
         down_outs = []
@@ -178,7 +142,6 @@ class GraphUnet(nn.Module):
             down_outs.append(X)
             A, X, idx = self.pools[i](A, X)
             indices_list.append(idx)
-            # print('Down_gcns, i = ', i)
         
         X = self.bottom_gcn(A, X)
         for i in range(self.l_n):
@@ -186,16 +149,12 @@ class GraphUnet(nn.Module):
             A, idx = adj_ms[up_idx], indices_list[up_idx]
             A, X = self.unpools[i](A, X, idx)
 
-            # Start Edit
-            # X = torch.cat([X, down_outs[up_idx]], 1)
-            # X = self.up_gcns[i](A, X)
-            # End Edit
 
             # Start Before Edit
             X = self.up_gcns[i](A, X)
             X = X.add(down_outs[up_idx])
             # End Before Edit
-        
+
         X = torch.cat([X, org_X], 1)
         X = self.end_gcn(A, X)
         
