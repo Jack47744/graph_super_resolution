@@ -17,7 +17,7 @@ Conventional equipment designed for detailed brain connectivity capture is often
 Our Super-AGSR-Net is the enhance version of the AGSR-Net. Inspired by the transformer model, we employ the attention network with the residual connection in Graph U-Net to capture varying node importance and long-range dependencies between non-neighbours. On the other hand, the discriminator’s residual connection helps counteract the vanishing gradients of the deep discriminator, allowing more efficient training. With an improved discriminator, Super-AGSR-Net’s generator receives better training feedback, encouraging it to produce a more accurate graph.
 
 
-- Figure of your model.
+![AGR-Net pipeline](/imgs/gnn_chart.png)
 
 ## Used External Libraries
 
@@ -29,7 +29,9 @@ pip install -q networkx optuna torch
 
 ## Results
 ![AGR-Net pipeline](/imgs/bar_plot.png)
-From the bar chart in 3-fold cross validation.
+![AGR-Net pipeline](/imgs/3-fold_result.png)
+
+Mean Absolute Error (MAE) ranges from 0.1281 to 0.1378. The model predicts HR samples with a level of accuracy, but there is still room for improvement. Pearson Correlation Coefficients (PCC) are consistently above 0.63, indicating a moderately strong positive correlation between the predicted HR value and the ground truth. This shows that the model successfully captures the general trend of the data. Jensen-Shannon Distance (JSD) remains around 0.28, showing that the predicted HR value partially diverged from the ground truth. Lastly, the average MAE with 3 different centrality types is very low, signifying that the model’s prediction captures ground truth’s network structure very well.
 
 
 ## References
