@@ -11,49 +11,13 @@ from utils import get_device
 
 device = get_device()
 
-
-class CosineSimilarityAllLoss(nn.Module):
-    def __init__(self):
-        super(CosineSimilarityAllLoss, self).__init__()
-
-    def forward(self, output, target):
-        output_flat = output.view(output.size(0), -1)
-        target_flat = target.view(target.size(0), -1)
-
-        cosine_loss = 1 - torch.mean(torch.cosine_similarity(output_flat, target_flat))
-        return cosine_loss
-
-
-class ColumnwiseCosineSimilarityLoss(nn.Module):
-    def __init__(self):
-        super(ColumnwiseCosineSimilarityLoss, self).__init__()
-
-    def forward(self, output, target):
-        # Initialize cosine similarity function
-        cosine_sim = nn.CosineSimilarity(dim=0)
-
-        # Compute cosine similarity for each column and then take the mean
-        # Assume output and target are square matrices of shape [n_nodes, n_nodes]
-        cosine_sims = torch.tensor(
-            [cosine_sim(output[:, i], target[:, i]) for i in range(output.shape[1])]
-        )
-
-        # Since we want to minimize the loss, and higher cosine similarity is better (closer to 1),
-        # we subtract the mean similarity from 1 to represent a loss to minimize.
-        cosine_loss = 1 - torch.mean(cosine_sims)
-        return cosine_loss
+criterion = nn.SmoothL1Loss(beta=0.01)
+criterion_L1 = nn.L1Loss()
+bce_loss = nn.BCELoss()
 
 
 def cal_error(model_outputs, hr, mask):
     return criterion_L1(model_outputs[mask], hr[mask])
-
-
-criterion = nn.SmoothL1Loss(beta=0.01)
-criterion_L1 = nn.L1Loss()
-kl_loss = nn.KLDivLoss()
-bce_loss = nn.BCELoss()
-cosine_sim_all_loss = CosineSimilarityAllLoss()
-cosine_sim_col_loss = ColumnwiseCosineSimilarityLoss()
 
 
 def train_gan(
@@ -69,7 +33,7 @@ def train_gan(
     stop_gan_mae=None,
 ):
 
-    print("inside train_gan")
+    print("inside Training GAN")
     all_epochs_loss = []
     no_epochs = args.epochs
     best_mae = np.inf
@@ -80,21 +44,14 @@ def train_gan(
     netG = netG.to(device)
     netD = netD.to(device)
 
-    print("Creating mask for upper triangular matrix...")
     mask = torch.triu(torch.ones(args.hr_dim, args.hr_dim), diagonal=1).bool()
 
-    print("Training GAN")
     with tqdm(range(no_epochs), desc="Epoch Progress", unit="epoch") as tepoch:
 
         for epoch in tepoch:
-            print(f"Epoch {epoch + 1}/{no_epochs}")
 
             epoch_loss = []
             epoch_error = []
-
-            # lossD = 0
-            # lossG = 0
-            # i = 0
 
             netG.train()
             netD.train()
@@ -126,7 +83,6 @@ def train_gan(
                     args.lmbda * criterion(net_outs, start_gcn_outs)
                     + criterion(netG.layer.weights, U_hr)
                     + criterion(filtered_matrix1, filtered_matrix2)
-                    #  + (1 - pearson_coor(filtered_matrix1, filtered_matrix2))
                 )
 
                 error = cal_error(model_outputs, hr, mask)
