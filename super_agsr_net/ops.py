@@ -58,6 +58,14 @@ class GAT(nn.Module):
     This layer applies an attention mechanism in the graph convolution process,
     allowing the model to focus on different parts of the neighborhood
     of each node.
+
+    Attributes:
+    weight (Tensor): The weight matrix of the layer.
+    bias (Tensor): The bias vector of the layer.
+    phi (Tensor): The attention parameter of the layer.
+    activation (function): The activation function to be used.
+    residual (bool): Whether to use residual connections.
+    out_features (int): The number of output features of the layer.
     """
     def __init__(self, in_features, out_features, activation = None, residual = False):
         super(GAT, self).__init__()
@@ -109,6 +117,23 @@ class GAT(nn.Module):
 
 
 class GraphUnet(nn.Module):
+    """
+    Our implementation of the Graph Unet model
+
+    Attributes:
+    ks (list): The list of pooling sizes.
+    in_dim (int): The number of input features.
+    out_dim (int): The number of output features.
+    dim (int): The number of features in the hidden layers.
+    start_gcn (GCN): The first GCN layer.
+    bottom_gcn (GCN): The bottom GCN layer.
+    end_gcn (GCN): The last GCN layer.
+    down_gcns (list): The list of GCN layers in the downsampling path.
+    up_gcns (list): The list of GCN layers in the upsampling path.
+    pools (list): The list of pooling layers.
+    unpools (list): The list of unpooling layers.
+    l_n (int): The number of pooling layers.
+    """
 
     def __init__(self, ks, in_dim, out_dim, dim=300):
         super(GraphUnet, self).__init__()

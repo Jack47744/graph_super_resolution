@@ -21,6 +21,9 @@ EPOCHS = 200
 
 
 def track_memory():
+    """
+    Track the memory usage of the process
+    """
     ram_usage = process.memory_info().rss / (1024**2)  # Convert to MB
     print(f"Current memory usage: {ram_usage:.2f} MB")
 
@@ -38,6 +41,15 @@ def get_device():
 
 
 def weight_variable_glorot(output_dim):
+    """
+    Initialize weights using the Glorot uniform initialization method.
+
+    Parameters:
+    - output_dim: The number of output features of the layer.
+    
+    Returns:
+    - A NumPy array of weights initialized using the Glorot uniform method.
+    """
 
     input_dim = output_dim
     init_range = np.sqrt(6.0 / (input_dim + output_dim))
@@ -75,6 +87,13 @@ def compute_degree_matrix_normalization_batch_numpy(adjacency_batch):
 
 
 def get_parser():
+    """
+    Create an argument parser for the GSR-Net model.
+
+    Returns:
+    - An argument parser for the GSR-Net model.
+    """
+
     parser = argparse.ArgumentParser(description="GSR-Net")
     parser.add_argument(
         "--epochs",
@@ -195,6 +214,18 @@ def get_parser():
 
 
 def evaluate(pred_matrices, gt_matrices, cal_graph=False):
+    """
+    Evaluate the performance of the model using the mean absolute error (MAE)
+    and Pearson correlation coefficient (PCC).
+
+    Parameters:
+    - pred_matrices: A PyTorch tensor of predicted adjacency matrices.
+    - gt_matrices: A PyTorch tensor of ground truth adjacency matrices.
+    - cal_graph: A boolean indicating whether to compute graph centrality measures.
+    
+    Returns:
+    - A dictionary containing the evaluation metrics.
+    """
 
     # pred_matrices = pred_matrices.cpu().detach().numpy()
     # gt_matrices = gt_matrices.cpu().detach().numpy()

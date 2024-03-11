@@ -7,6 +7,12 @@ device = get_device()
 
 
 def pad_HR_adj(label, split):
+    """
+    Pad the adjacency matrix of the HR graph with zeros
+    :param label: The adjacency matrix of the HR graph
+    :param split: The number of zeros to pad the matrix with
+    :return: The padded adjacency matrix
+    """
 
     # Pad the tensor
     padding = (split, split, split, split)  # Padding for left, right, top, bottom
@@ -23,6 +29,12 @@ def pad_HR_adj(label, split):
 
 
 def normalize_adj_torch(mx):
+    """
+    Normalize the adjacency matrix
+    :param mx: The adjacency matrix
+    :return: The normalized adjacency matrix
+    """
+
     rowsum = mx.sum(1)
     r_inv_sqrt = torch.pow(rowsum, -0.5).flatten()
     r_inv_sqrt[torch.isinf(r_inv_sqrt)] = 0.0
