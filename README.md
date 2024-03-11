@@ -2,7 +2,11 @@
 
 ## Contributors
 
-- List the names of your team members and the name of your team.
+- Metis Sotangkur (ms922@ic.ac.uk)
+- Wutikorn Ratanapan (wr323@ic.ac.uk)
+- Carlos Brat (cb1223@ic.ac.uk)
+- Marios Charalambides (mc1122@ic.ac.uk)
+- Aryan Agrawal ()
 
 ## Problem Description
 
