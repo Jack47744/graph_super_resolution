@@ -1,4 +1,4 @@
-# DGL2024 Brain Graph Super-Resolution Challenge
+# DGL2024 Brain Graph Super-Resolution Challenge - Super Idol
 
 ## Contributors
 
@@ -12,7 +12,7 @@
 
 Conventional equipment designed for detailed brain connectivity capture is often expensive and may not be readily accessible in various regions. However, devices that provide a rough approximation of brain connectivity are more widely accessible. This discrepancy poses a significant question: why can't we infer higher-resolution brain connectivity using more accessible devices currently available? In response to this challenge, our team, Super Idol, has developed an enhanced version of the AGSR-Net, Super-AGSR-Net. Our Super-AGSR-Net recognizes the importance of complex structural patterns in brain connectivity analysis and aims to better capture these intricacies for improved high-resolution predictions.
 
-## Super Idol - Methodology
+## Super AGSR-Net - Methodology
 
 Our Super-AGSR-Net is the enhance version of the AGSR-Net. Inspired by the transformer model, we employ the attention network with the residual connection in Graph U-Net to capture varying node importance and long-range dependencies between non-neighbours. On the other hand, the discriminator’s residual connection helps counteract the vanishing gradients of the deep discriminator, allowing more efficient training. With an improved discriminator, Super-AGSR-Net’s generator receives better training feedback, encouraging it to produce a more accurate graph.
 
