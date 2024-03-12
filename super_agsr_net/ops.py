@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
+<<<<<<< HEAD:gsr_net/ops.py
 from layers import GCNLayer
 
 import os
@@ -17,6 +18,9 @@ def get_device():
     # Fallback to CPU
     else:
         return torch.device("cpu")
+=======
+from  utils import get_device
+>>>>>>> 143fbb4bca6ad02b743607de1b8f0d5ffb7f3134:super_agsr_net/ops.py
 
 device = get_device()
 
@@ -36,7 +40,6 @@ class GraphUnpool(nn.Module):
         # print(f"GraphUnpool new_X: {new_X.shape}")
         return A, new_X
 
-    
 class GraphPool(nn.Module):
 
     def __init__(self, k, in_dim):
@@ -47,10 +50,14 @@ class GraphPool(nn.Module):
 
     def forward(self, A, X):
         scores = self.proj(X)
+<<<<<<< HEAD:gsr_net/ops.py
         # scores = torch.abs(scores)
         # print(f"GraphPool scores: {scores.shape}")
         scores = torch.squeeze(scores, dim=2)
         # print(f"GraphPool scores: {scores.shape}")
+=======
+        scores = torch.squeeze(scores)
+>>>>>>> 143fbb4bca6ad02b743607de1b8f0d5ffb7f3134:super_agsr_net/ops.py
         scores = self.sigmoid(scores/100)
         num_nodes = A.shape[1]
         values, idx = torch.topk(scores, int(self.k*num_nodes))
@@ -71,8 +78,6 @@ class GCN(nn.Module):
         self.drop = nn.Dropout(p=0)
 
     def forward(self, A, X):
-        # print(X.device)
-        # print(self.proj.weight.device)
         X = self.drop(X)
         X = torch.matmul(A, X)
         X = self.proj(X)
@@ -156,11 +161,21 @@ class GAT(nn.Module):
     This layer applies an attention mechanism in the graph convolution process,
     allowing the model to focus on different parts of the neighborhood
     of each node.
+
+    Attributes:
+    weight (Tensor): The weight matrix of the layer.
+    bias (Tensor): The bias vector of the layer.
+    phi (Tensor): The attention parameter of the layer.
+    activation (function): The activation function to be used.
+    residual (bool): Whether to use residual connections.
+    out_features (int): The number of output features of the layer.
     """
+<<<<<<< HEAD:gsr_net/ops.py
     def __init__(self, in_features, out_features, activation = None, residual=False, layer_norm=True):
+=======
+    def __init__(self, in_features, out_features, activation = None, residual = False):
+>>>>>>> 143fbb4bca6ad02b743607de1b8f0d5ffb7f3134:super_agsr_net/ops.py
         super(GAT, self).__init__()
-        # Initialize the weights, bias, and attention parameters as
-        # trainable parameters
         self.weight = nn.Parameter(torch.FloatTensor(in_features, out_features))
         self.bias = nn.Parameter(torch.zeros(out_features))
         self.phi = nn.Parameter(torch.FloatTensor(2 * out_features, 1))
@@ -168,7 +183,9 @@ class GAT(nn.Module):
         self.residual = residual
         self.layer_norm = layer_norm
         self.reset_parameters()
-
+        self.residual = residual
+        self.out_features = out_features
+        
     def reset_parameters(self):
         # stdv = 1. / np.sqrt(self.weight.size(1))
         # self.weight.data.uniform_(-stdv, stdv)
@@ -179,6 +196,19 @@ class GAT(nn.Module):
         nn.init.xavier_uniform_(self.phi)
 
     def forward(self, adj, input):
+<<<<<<< HEAD:gsr_net/ops.py
+=======
+        """
+        Forward pass of the GAT layer.
+
+        Parameters:
+        input (Tensor): The input features of the nodes.
+        adj (Tensor): The adjacency matrix of the graph.
+
+        Returns:
+        Tensor: The output features of the nodes after applying the GAT layer.
+        """
+>>>>>>> 143fbb4bca6ad02b743607de1b8f0d5ffb7f3134:super_agsr_net/ops.py
         x_prime = input @ self.weight  + self.bias
 
         N = adj.size(0)
@@ -186,51 +216,82 @@ class GAT(nn.Module):
         S = (a_input @ self.phi).view(N, N)
         S = F.leaky_relu(S, negative_slope=0.2)
 
-        mask = (adj + torch.eye(adj.size(0))) > 0
+        mask = (adj + torch.eye(adj.size(0), device = device)) > 0
         S_masked = torch.where(mask, S, torch.full_like(S, -1e9))
         attention = F.softmax(S_masked, dim=1)
         h = attention @ x_prime
 
+<<<<<<< HEAD:gsr_net/ops.py
         if self.residual:
             h = input + h
 
         if self.activation:
             h = self.activation(h)
+=======
+        if self.activation:
+            h = self.activation(h)
+
+        if self.residual:
+            h = input + h
+
+>>>>>>> 143fbb4bca6ad02b743607de1b8f0d5ffb7f3134:super_agsr_net/ops.py
         return h
 
 
 class GraphUnet(nn.Module):
+    """
+    Our implementation of the Graph Unet model
+
+    Attributes:
+    ks (list): The list of pooling sizes.
+    in_dim (int): The number of input features.
+    out_dim (int): The number of output features.
+    dim (int): The number of features in the hidden layers.
+    start_gcn (GCN): The first GCN layer.
+    bottom_gcn (GCN): The bottom GCN layer.
+    end_gcn (GCN): The last GCN layer.
+    down_gcns (list): The list of GCN layers in the downsampling path.
+    up_gcns (list): The list of GCN layers in the upsampling path.
+    pools (list): The list of pooling layers.
+    unpools (list): The list of unpooling layers.
+    l_n (int): The number of pooling layers.
+    """
 
     def __init__(self, ks, in_dim, out_dim, dim=300):
         super(GraphUnet, self).__init__()
         self.ks = ks
+<<<<<<< HEAD:gsr_net/ops.py
        
         self.start_gcn = MultiHeadGAT(in_dim, dim)
         # self.bottom_gcn = GAT(dim, dim)
         self.bottom_gcn = MultiHeadGAT(dim, dim, residual=True)
         self.end_gcn = MultiHeadGAT(2*dim, out_dim)
+=======
+        dim = out_dim
+
+        self.start_gcn = GAT(in_dim, dim, activation=F.leaky_relu)
+        self.bottom_gcn = GAT(dim, dim, residual=True, activation=F.leaky_relu)
+        self.end_gcn = GAT(2*dim, out_dim, activation=F.leaky_relu)
+>>>>>>> 143fbb4bca6ad02b743607de1b8f0d5ffb7f3134:super_agsr_net/ops.py
         self.down_gcns = []
         self.up_gcns = []
         self.pools = []
         self.unpools = []
         self.l_n = len(ks)
 
+<<<<<<< HEAD:gsr_net/ops.py
         # self.down_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
         # self.up_gcns = nn.ModuleList([GAT(dim, dim) for i in range(self.l_n)])
         self.down_gcns = nn.ModuleList([MultiHeadGAT(dim, dim, residual=True) for i in range(self.l_n)])
         self.up_gcns = nn.ModuleList([MultiHeadGAT(dim, dim, residual=True) for i in range(self.l_n)])
+=======
+        self.down_gcns = nn.ModuleList([GAT(dim, dim, residual=True, activation=F.leaky_relu) for i in range(self.l_n)])
+        self.up_gcns = nn.ModuleList([GAT(dim, dim, residual=True, activation=F.leaky_relu) for i in range(self.l_n)])
+>>>>>>> 143fbb4bca6ad02b743607de1b8f0d5ffb7f3134:super_agsr_net/ops.py
         self.pools = nn.ModuleList([GraphPool(ks[i], dim) for i in range(self.l_n)])
         self.unpools = nn.ModuleList([GraphUnpool() for i in range(self.l_n)])
-        self.convs = nn.ModuleList([nn.Conv2d(in_channels=2, out_channels=1, kernel_size=3, padding=1, bias=True) for _ in range(self.l_n)])
-
-        # for i in range(self.l_n):
-        #     self.down_gcns.append(GCN(dim, dim))
-        #     self.up_gcns.append(GCN(dim, dim))
-        #     self.pools.append(GraphPool(ks[i], dim))
-        #     self.unpools.append(GraphUnpool())
 
     def forward(self, A, X):
-        # print('start_gcn device: ', self.start_gcn.device)
         adj_ms = []
         indices_list = []
         down_outs = []
@@ -256,12 +317,21 @@ class GraphUnet(nn.Module):
             # print(f"unpool X: {X.shape}")
             # print(f"unpool idx: {idx.shape}")
             A, X = self.unpools[i](A, X, idx)
+
+
+            # Start Before Edit
             X = self.up_gcns[i](A, X)
             X = X.add(down_outs[up_idx])
+<<<<<<< HEAD:gsr_net/ops.py
         X = torch.cat([X, org_X], dim=2)
         # print("moving to end gcn")
         # print(f"end_gcn X: {X.shape}")
         # print(f"end_gcn A: {A.shape}")
+=======
+            # End Before Edit
+
+        X = torch.cat([X, org_X], 1)
+>>>>>>> 143fbb4bca6ad02b743607de1b8f0d5ffb7f3134:super_agsr_net/ops.py
         X = self.end_gcn(A, X)
         
         return X, start_gcn_outs[:, :, :268]
