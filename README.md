@@ -33,6 +33,8 @@ pip install -q networkx optuna torch
 
 Mean Absolute Error (MAE) ranges from 0.1281 to 0.1378. The model predicts HR samples with a level of accuracy, but there is still room for improvement. Pearson Correlation Coefficients (PCC) are consistently above 0.63, indicating a moderately strong positive correlation between the predicted HR value and the ground truth. This shows that the model successfully captures the general trend of the data. Jensen-Shannon Distance (JSD) remains around 0.28, showing that the predicted HR value partially diverged from the ground truth. Lastly, the average MAE with 3 different centrality types is very low, signifying that the model’s prediction captures ground truth’s network structure very well.
 
+Our model achieved a Kaggle public score of 0.130581 (ranked 12th) and a private score of 0.152392 (ranked 14th).
+
 
 ## References
 Isallari, M., Rekik, I.: Brain graph super-resolution using adversarial graph neural network with application to functional brain connectivity. Medical Image Analysis 71 (2021) 102084. Elsevier.
